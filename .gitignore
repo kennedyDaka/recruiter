@@ -1,0 +1,20 @@
+node_modules
+# Keep environment variables out of version control
+.env
+.env.local
+
+/src/generated/prisma
+.output
+dist
+.freebuff
+*.db
+*.db-journal
+occ-full.json
+onet-openapi.json
+skills-lock.json
+start-server.bat
+uploads/
+uploads-test/
+.agents/
+.tanstack/
+check-campaign.cjs

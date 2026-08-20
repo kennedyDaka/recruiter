@@ -1,0 +1,744 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Core Multi-Tenant ──────────────────────────────────────────────
+
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  industry        String?
+  country         String?
+  city            String?
+  phone           String?
+  email           String?
+  website         String?
+  logo_url        String?
+  settings        String?  // JSON: tenant-level config (auto-pipeline, email, whatsapp, distribution)
+  primary_color   String   @default("#0f766e")
+  secondary_color String   @default("#1e293b")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  profiles       Profile[]
+  campaigns      Campaign[]
+  candidates     Candidate[]
+  applications   Application[]
+  communications Communication[]
+  notes          Note[]
+  auditLogs      AuditLog[]
+  invoices       Invoice[]
+  payments       Payment[]
+  subscriptions  Subscription[]
+  userRoles      UserRole[]
+
+  @@map("tenants")
+}
+
+model Profile {
+  id                String   @id
+  tenant_id         String?
+  full_name         String
+  email             String?
+  phone             String?
+  avatar_url        String?
+  email_verified    Boolean  @default(false)
+  verify_token      String?
+  verify_expires_at String?
+  reset_token       String?
+  reset_expires_at  String?
+  /// Bumped on every password change; session JWTs are invalidated when the claim lags.
+  session_version   Int      @default(0)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  tenant     Tenant?  @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
+  roles      UserRole[]
+
+  @@index([tenant_id])
+  @@map("profiles")
+}
+
+/** Failed authentication attempts — powers the sign-in lockout. */
+model AuthAttempt {
+  id         String   @id @default(uuid())
+  email      String
+  ip         String?
+  kind       String   @default("signin")
+  created_at DateTime @default(now())
+
+  @@index([email, created_at])
+  @@index([ip, created_at])
+  @@map("auth_attempts")
+}
+
+model AuthCredential {
+  user_id       String   @id
+  password_hash String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("auth_credentials")
+}
+
+model UserRole {
+  id         String  @id @default(uuid())
+  user_id    String
+  tenant_id  String
+  role       String  @default("recruiter")
+  created_at DateTime @default(now())
+
+  user       Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tenant     Tenant  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role])
+  @@index([user_id])
+  @@index([tenant_id])
+  @@map("user_roles")
+}
+
+// ─── Campaigns ──────────────────────────────────────────────────────
+
+model Campaign {
+  id                   String   @id @default(uuid())
+  tenant_id            String
+  name                 String
+  slug                 String   @unique
+  job_title            String
+  job_description      String?
+  hiring_reason        String?
+  positions            Int      @default(1)
+  location             String?
+  employment_type      String?
+  min_qualification    String?
+  min_experience_years Int      @default(0)
+  required_skills      String   @default("[]")
+  required_certifications String @default("[]")
+  responsibilities     String?
+  required_documents   String   @default("[]")
+  salary_min           Int?
+  salary_max           Int?
+  salary_currency      String   @default("MWK")
+  start_date           DateTime?
+  closing_date         DateTime?
+  published_at         DateTime?
+  public_token         String?  @unique
+  weights              String?
+  thresholds           String?
+  builder              String?
+  competencies         String   @default("[]")
+  referee_count        Int      @default(2)
+  status               String   @default("draft")
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  tenant               Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  questions            CampaignQuestion[]
+  stages               RecruitmentStage[]
+  applications         Application[]
+  invoices             Invoice[]
+  subscriptions       Subscription[]
+
+  @@index([tenant_id])
+  @@index([tenant_id, status])
+  @@index([status])
+  @@index([created_at])
+  @@map("campaigns")
+}
+
+model CampaignQuestion {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  campaign_id    String
+  question_text  String
+  question_type  String   @default("text")
+  options        String?
+  dimension      String?
+  weight         Int      @default(1)
+  sort_order     Int      @default(0)
+  category       String?
+  is_mandatory   Boolean  @default(false)
+  condition      String?
+  created_at     DateTime @default(now())
+
+  campaign       Campaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  answerOptions  CampaignAnswerOption[]
+  candidateAnswers CandidateAnswer[]
+
+  @@index([campaign_id])
+  @@map("campaign_questions")
+}
+
+model CampaignAnswerOption {
+  id               String  @id @default(uuid())
+  tenant_id        String
+  question_id      String
+  label            String
+  value            String
+  points           Int     @default(0)
+  is_disqualifying Boolean @default(false)
+  sort_order       Int     @default(0)
+
+  question         CampaignQuestion @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@index([question_id])
+  @@map("campaign_answer_options")
+}
+
+// ─── Recruitment Stages ─────────────────────────────────────────────
+
+model RecruitmentStage {
+  id          String  @id @default(uuid())
+  tenant_id   String
+  campaign_id String
+  name        String
+  position    Int     @default(0)
+  is_terminal Boolean @default(false)
+  created_at  DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([campaign_id])
+  @@map("recruitment_stages")
+}
+
+// ─── Candidates ─────────────────────────────────────────────────────
+
+model Candidate {
+  id                 String   @id @default(uuid())
+  tenant_id          String
+  first_name         String
+  middle_name        String?
+  last_name          String
+  email              String
+  phone              String?
+  date_of_birth      String?
+  gender             String?
+  nationality        String?
+  location           String?
+  country            String?
+  city               String?
+  professional_summary String?
+  linkedin_url       String?
+  portfolio_url      String?
+  cv_url             String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  tenant             Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  applications       Application[]
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+  @@map("candidates")
+}
+
+model CandidateEducation {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String
+  qualification  String
+  field_of_study String?
+  institution    String?
+  country        String?
+  start_year     Int?
+  end_year       Int?
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_education")
+}
+
+model CandidateExperience {
+  id                String   @id @default(uuid())
+  tenant_id         String
+  application_id    String
+  employer          String
+  position          String
+  field             String?
+  start_date        String?
+  end_date          String?
+  is_current        Boolean  @default(false)
+  responsibilities  String?
+  reason_for_leaving String?
+
+  application       Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_experience")
+}
+
+model CandidateSkill {
+  id             String  @id @default(uuid())
+  tenant_id      String
+  application_id String
+  skill          String
+  category       String?
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_skills")
+}
+
+model CandidateCertification {
+  id             String  @id @default(uuid())
+  tenant_id      String
+  application_id String
+  certification  String
+  category       String?
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_certifications")
+}
+
+model CandidateDocument {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String
+  doc_type       String
+  file_name      String
+  file_path      String
+  file_size      Int      @default(0)
+  storage_key    String?
+  uploaded_at    DateTime @default(now())
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_documents")
+}
+
+model CandidateReferee {
+  id             String  @id @default(uuid())
+  tenant_id      String
+  application_id String
+  name           String
+  organisation   String?
+  position       String?
+  relationship   String?
+  phone          String?
+  email          String?
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("candidate_referees")
+}
+
+// ─── Applications ───────────────────────────────────────────────────
+
+model Application {
+  id                   String   @id @default(uuid())
+  tenant_id            String
+  campaign_id          String
+  candidate_id         String
+  reference            String   @unique
+  status               String   @default("submitted")
+  stage_id             String?
+  score                Int      @default(0)
+  score_breakdown      String?
+  recommendation       String?
+  mandatory_status     String?
+  eligibility_status   String?
+  eligibility_reasons  String?
+  score_reasons        String?
+  score_version        Int?
+  mandatory_reasons    String   @default("[]")
+  years_experience     Int      @default(0)
+  highest_qualification String?
+  cv_url               String?
+  consent_given        Boolean  @default(false)
+  consent_given_at     DateTime?
+  consent_version      String?
+  submitted_at         DateTime @default(now())
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  tenant               Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  campaign             Campaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  candidate            Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+  stage                RecruitmentStage? @relation(fields: [stage_id], references: [id], onDelete: SetNull)
+  education            CandidateEducation[]
+  experience           CandidateExperience[]
+  skills               CandidateSkill[]
+  certifications       CandidateCertification[]
+  documents            CandidateDocument[]
+  referees             CandidateReferee[]
+  answers              CandidateAnswer[]
+  stageHistory         ApplicationStageHistory[]
+  interviews           Interview[]
+  communications       Communication[]
+  notes                Note[]
+
+  @@unique([tenant_id, campaign_id, candidate_id])
+  @@index([tenant_id])
+  @@index([campaign_id])
+  @@index([candidate_id])
+  @@index([status])
+  @@map("applications")
+}
+
+model CandidateAnswer {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String
+  question_id    String?
+  question_text  String
+  answer         String?
+  dimension      String?
+  points         Int      @default(0)
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  question       CampaignQuestion? @relation(fields: [question_id], references: [id], onDelete: SetNull)
+
+  @@index([application_id])
+  @@map("candidate_answers")
+}
+
+model ApplicationStageHistory {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String
+  from_stage     String?
+  to_stage       String
+  changed_by     String?
+  notes          String?
+  created_at     DateTime @default(now())
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id])
+  @@map("application_stage_history")
+}
+
+// ─── Interviews ─────────────────────────────────────────────────────
+
+model Interview {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String
+  scheduled_at   DateTime?
+  duration_min   Int      @default(30)
+  interviewer    String?
+  location       String?
+  notes          String?
+  status         String   @default("scheduled")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  scores         InterviewScore[]
+
+  @@index([application_id])
+  @@index([tenant_id])
+  @@map("interviews")
+}
+
+model InterviewScore {
+  id            String   @id @default(uuid())
+  interview_id  String
+  dimension     String
+  score         Int
+  max_score     Int      @default(10)
+  notes         String?
+  created_at    DateTime @default(now())
+
+  interview     Interview @relation(fields: [interview_id], references: [id], onDelete: Cascade)
+
+  @@index([interview_id])
+  @@map("interview_scores")
+}
+
+// ─── Communications ─────────────────────────────────────────────────
+
+model Communication {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String?
+  channel        String   @default("email")
+  template       String?
+  subject        String?
+  body           String?
+  recipient      String?
+  status         String   @default("queued")
+  error          String?
+  sent_at        DateTime?
+  created_at     DateTime @default(now())
+
+  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  application    Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+
+  @@index([tenant_id])
+  @@index([status])
+  @@map("communications")
+}
+
+// ─── Notes ──────────────────────────────────────────────────────────
+
+model Note {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String?
+  author_id      String?
+  body           String
+  created_at     DateTime @default(now())
+
+  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  application    Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+
+  @@index([application_id])
+  @@map("notes")
+}
+
+// ─── Audit Logs ─────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  actor_id   String
+  action     String
+  entity     String?
+  entity_id  String?
+  metadata   String?
+  created_at DateTime @default(now())
+
+  tenant     Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@map("audit_logs")
+}
+
+// ─── Billing & Payments ─────────────────────────────────────────────
+
+/** Campaign pricing plans — determines cost, duration, and feature limits. */
+model Plan {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  duration_days   Int
+  price           Int      // Amount in smallest currency unit (MWK)
+  currency        String   @default("MWK")
+  candidate_limit Int      @default(100)  // Max candidates per campaign
+  recruiter_limit Int      @default(5)    // Max recruiters per campaign
+  features        String   @default("[]") // JSON array of feature flags
+  active          Boolean  @default(true)
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  invoices        Invoice[]
+  subscriptions  Subscription[]
+
+  @@map("plans")
+}
+
+/** Invoice records — generated when a company purchases a plan. */
+model Invoice {
+  id                String   @id @default(uuid())
+  tenant_id         String
+  plan_id           String
+  campaign_id       String?
+  invoice_number    String   @unique
+  amount            Int
+  currency          String   @default("MWK")
+  status            String   @default("pending") // pending, processing, paid, failed, cancelled, expired, refunded
+  due_at            DateTime?
+  paid_at           DateTime?
+  metadata          String?  // JSON for extra data
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  plan              Plan     @relation(fields: [plan_id], references: [id])
+  campaign          Campaign? @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  subscription     Subscription?
+
+  @@index([tenant_id])
+  @@index([campaign_id])
+  @@index([status])
+  @@map("invoices")
+}
+
+/** Payment records — tracks individual payment attempts via providers. */
+model Payment {
+  id                      String   @id @default(uuid())
+  tenant_id               String
+  invoice_id              String
+  provider                String   @default("paychangu") // paychangu, stripe, malipo, etc.
+  provider_transaction_id String?  // Charge ID from PayChangu
+  tx_ref                  String   @unique // Our internal reference
+  provider_tx_ref         String?  // Provider's reference
+  amount                  Int
+  currency                String   @default("MWK")
+  payment_method          String?  // airtel_money, tnmmamba, visa, mastercard, bank_transfer
+  status                  String   @default("pending") // pending, processing, success, failed, cancelled, refunded
+  error_message           String?
+  webhook_received_at     DateTime?
+  verified_at             DateTime?
+  initiated_at            DateTime @default(now())
+  completed_at            DateTime?
+  failed_at               DateTime?
+  metadata                String?  // JSON for provider-specific data
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  tenant                  Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  invoice                 Invoice  @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([invoice_id])
+  @@index([status])
+  @@index([provider_transaction_id])
+  @@map("payments")
+}
+
+/** Subscriptions — tracks active plan subscriptions for campaigns. */
+model Subscription {
+  id            String   @id @default(uuid())
+  tenant_id     String
+  plan_id       String
+  invoice_id    String?
+  campaign_id   String?
+  start_date    DateTime
+  end_date      DateTime
+  status        String   @default("active") // active, cancelled, expired, past_due
+  auto_renew    Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  plan          Plan     @relation(fields: [plan_id], references: [id])
+  invoice       Invoice?  @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  campaign      Campaign? @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
+
+  @@unique([invoice_id])
+  @@index([tenant_id])
+  @@index([campaign_id])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/** Webhook logs — stores PayChangu webhook payloads for audit trail. */
+model WebhookLog {
+  id            String   @id @default(uuid())
+  provider      String   @default("paychangu")
+  event_type    String
+  payload       String   // Raw JSON payload
+  signature     String?  // HMAC signature for verification
+  processed     Boolean  @default(false)
+  error         String?
+  created_at    DateTime @default(now())
+
+  @@index([provider, event_type])
+  @@index([processed])
+  @@map("webhook_logs")
+}
+
+// ─── Recruitment Catalog ────────────────────────────────────────────
+
+model SkillLibrary {
+  id            String @id @default(uuid())
+  name          String @unique
+  category      String?
+  industry_slug String?
+
+  @@map("skill_library")
+}
+
+model CertificationLibrary {
+  id       String @id @default(uuid())
+  name     String @unique
+  category String?
+
+  @@map("certification_library")
+}
+
+model LicenseLibrary {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  category String?
+  classes  String? // JSON array of class names
+
+  @@map("license_library")
+}
+
+model Industry {
+  id        String      @id @default(uuid())
+  name      String      @unique
+  slug      String?
+  families  JobFamily[]
+
+  @@map("industries")
+}
+
+model JobFamily {
+  id          String @id @default(uuid())
+  name        String
+  industry_id String?
+
+  industry    Industry? @relation(fields: [industry_id], references: [id], onDelete: SetNull)
+  titles      JobTitle[]
+
+  @@map("job_families")
+}
+
+model JobTitle {
+  id          String @id @default(uuid())
+  name        String
+  family_id   String?
+
+  family      JobFamily? @relation(fields: [family_id], references: [id], onDelete: SetNull)
+
+  @@map("job_titles")
+}
+
+/// Platform-wide job title master: titles added by recruiters when no
+/// external catalog (ESCO/O*NET) matched. A controlled addition — every
+/// tenant's searches surface it, and it scores through the ORS blueprint
+/// like any other title (attributes, not database identity).
+model JobTitleMaster {
+  id              String   @id @default(uuid())
+  name            String
+  normalized_name String   @unique
+  family_id       String?
+  source          String   @default("manual")
+  status          String   @default("pending")
+  created_at      DateTime @default(now())
+
+  @@map("job_title_master")
+}
+
+model FieldOfStudy {
+  id   String @id @default(uuid())
+  name String @unique
+
+  @@map("fields_of_study")
+}
+
+model University {
+  id             String   @id @default(uuid())
+  name           String
+  country        String?
+  alpha_two_code String?
+  domains        String?
+  web_pages      String?
+  source         String   @default("hipo")
+  status         String   @default("active")
+  created_at     DateTime @default(now())
+
+  @@unique([name, country])
+  @@map("universities")
+}

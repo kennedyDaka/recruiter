@@ -1,6 +1,6 @@
 {
   "outputDirectory": ".",
-  "buildCommand": "NODE_ENV=production npx vite build",
+  "buildCommand": "NODE_ENV=production npx vite build && cp -r dist/client/* .",
   "rewrites": [
     {
       "source": "/((?!api/|_next/|assets/).*)",

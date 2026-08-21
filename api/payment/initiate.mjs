@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 
     // Get tenant ID from profile
     const profileRes = await pool.query(
-      "SELECT tenant_id FROM profiles WHERE id = (SELECT profile_id FROM auth_credentials WHERE user_id = $1) LIMIT 1",
+      "SELECT tenant_id FROM profiles WHERE id = $1",
       [userId]
     );
     const tenantId = profileRes.rows[0]?.tenant_id;

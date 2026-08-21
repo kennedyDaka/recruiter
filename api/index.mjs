@@ -19,7 +19,6 @@ export default async function handler(req, res) {
     };
 
     if (req.method !== "GET" && req.method !== "HEAD") {
-      // Collect the request body
       const chunks = [];
       for await (const chunk of req) {
         chunks.push(chunk);
@@ -28,32 +27,18 @@ export default async function handler(req, res) {
     }
 
     const request = new Request(url.toString(), init);
-    const response = await server.fetch(request);
+    const response = await server.fetch(request, process.env, {});
 
-    res.status(response.status);
+    res.status(response.status || 200);
     response.headers.forEach((value, key) => {
       res.setHeader(key, value);
     });
 
-    if (response.body) {
-      const reader = response.body.getReader();
-      const pump = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            res.end();
-            return;
-          }
-          res.write(value);
-        }
-      };
-      await pump();
-    } else {
-      res.end();
-    }
+    const body = await response.text();
+    res.send(body);
   } catch (error) {
-    console.error("Server error:", error);
+    console.error("Server error:", error.message, error.stack);
     res.status(500);
-    res.json({ error: "Internal Server Error" });
+    res.json({ error: error.message || "Internal Server Error" });
   }
 }

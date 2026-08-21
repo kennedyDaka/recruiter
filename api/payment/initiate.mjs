@@ -106,11 +106,12 @@ export default async function handler(req, res) {
     // Create invoice
     const invNumber = `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const invoiceId = crypto.randomUUID();
+    const now = new Date().toISOString();
     const invoiceRes = await pool.query(
-      `INSERT INTO invoices (id, tenant_id, plan_id, campaign_id, invoice_number, amount, currency, status, due_at, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, 'MWK', 'pending', NOW() + INTERVAL '7 days', $7)
+      `INSERT INTO invoices (id, tenant_id, plan_id, campaign_id, invoice_number, amount, currency, status, due_at, metadata, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'MWK', 'pending', NOW() + INTERVAL '7 days', $7, $8, $8)
        RETURNING id, invoice_number, amount, currency`,
-      [invoiceId, tenantId, planId, campaignId, invNumber, amount, JSON.stringify({ num_days: numDays, daily_rate: DAILY_RATE })]
+      [invoiceId, tenantId, planId, campaignId, invNumber, amount, JSON.stringify({ num_days: numDays, daily_rate: DAILY_RATE }), now]
     );
     const invoice = invoiceRes.rows[0];
 
@@ -120,10 +121,10 @@ export default async function handler(req, res) {
     // Create payment record
     const paymentId = crypto.randomUUID();
     const payRes = await pool.query(
-      `INSERT INTO payments (id, tenant_id, invoice_id, provider, tx_ref, amount, currency, status, metadata)
-       VALUES ($1, $2, $3, 'paychangu', $4, $5, 'MWK', 'pending', $6)
+      `INSERT INTO payments (id, tenant_id, invoice_id, provider, tx_ref, amount, currency, status, metadata, initiated_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'paychangu', $4, $5, 'MWK', 'pending', $6, $7, $7, $7)
        RETURNING id, tx_ref`,
-      [paymentId, tenantId, invoice.id, txRef, invoice.amount, JSON.stringify({ customer_email: customer.email, customer_name: customer.name })]
+      [paymentId, tenantId, invoice.id, txRef, invoice.amount, JSON.stringify({ customer_email: customer.email, customer_name: customer.name }), now]
     );
 
     // Mark invoice as processing

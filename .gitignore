@@ -18,3 +18,5 @@ uploads-test/
 .agents/
 .tanstack/
 check-campaign.cjs
+
+.vercel

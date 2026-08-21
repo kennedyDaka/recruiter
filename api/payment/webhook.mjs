@@ -99,13 +99,38 @@ export default async function handler(req, res) {
       }
 
       if (payment.campaign_id) {
-        await pool.query(
-          `UPDATE campaigns SET status = 'active',
-           published_at = COALESCE(published_at, NOW()), updated_at = NOW()
-           WHERE id = $1`,
+        const campResult = await pool.query(
+          'SELECT status, public_token, closing_date FROM campaigns WHERE id = $1',
           [payment.campaign_id]
         );
-        console.log(`Campaign ${payment.campaign_id} activated`);
+        if (campResult.rows.length > 0) {
+          const camp = campResult.rows[0];
+          if (!camp.public_token) {
+            const rand = () => Math.random().toString(36).slice(2, 10);
+            const publicToken = rand() + rand();
+            await pool.query(
+              `UPDATE campaigns SET
+                status = 'active',
+                published_at = NOW(),
+                updated_at = NOW(),
+                public_token = $1,
+                closing_date = NOW() + '30 days'::interval
+              WHERE id = $2`,
+              [publicToken, payment.campaign_id]
+            );
+            console.log('Campaign', payment.campaign_id, 'activated with token', publicToken);
+          } else {
+            await pool.query(
+              `UPDATE campaigns SET
+                status = 'active',
+                updated_at = NOW(),
+                closing_date = GREATEST(closing_date, NOW()) + '30 days'::interval
+              WHERE id = $1`,
+              [payment.campaign_id]
+            );
+            console.log('Campaign', payment.campaign_id, 'extended');
+          }
+        }
       }
 
       return res.status(200).json({ received: true });

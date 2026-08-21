@@ -151,7 +151,8 @@ export default async function handler(req, res) {
         last_name: lastName,
         email: customer.email,
         callback_url: `${process.env.APP_URL}/api/payment/webhook`,
-        return_url: `${process.env.APP_URL}/payment/success?tx_ref=${txRef}`,
+        return_url: `${process.env.APP_URL}/payment/success?tx_ref=${txRef}&campaign_id=${campaignId}`,
+        cancel_url: `${process.env.APP_URL}/payment/failed?tx_ref=${txRef}&campaign_id=${campaignId}&reason=cancelled`,
         customization: {
           title: "Operon Recruit",
           description: `${numDays}-day campaign activation`,

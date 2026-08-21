@@ -22,6 +22,7 @@ import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ApiPlansRouteImport } from './routes/api/plans'
 import { Route as ApplyCampaignIdRouteImport } from './routes/apply.$campaignId'
+import { Route as PaymentFailedRouteImport } from './routes/payment.failed'
 import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
 import { Route as SessionCallbackRouteImport } from './routes/session.callback'
 import { Route as SessionSignoutRouteImport } from './routes/session.signout'
@@ -99,6 +100,11 @@ const ApiPlansRoute = ApiPlansRouteImport.update({
 const ApplyCampaignIdRoute = ApplyCampaignIdRouteImport.update({
   id: '/apply/$campaignId',
   path: '/apply/$campaignId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentFailedRoute = PaymentFailedRouteImport.update({
+  id: '/payment/failed',
+  path: '/payment/failed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
+  '/payment/failed': typeof PaymentFailedRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
+  '/payment/failed': typeof PaymentFailedRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
@@ -249,6 +257,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
+  '/payment/failed': typeof PaymentFailedRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/plans'
     | '/apply/$campaignId'
+    | '/payment/failed'
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/plans'
     | '/apply/$campaignId'
+    | '/payment/failed'
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/api/plans'
     | '/apply/$campaignId'
+    | '/payment/failed'
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
@@ -360,6 +372,7 @@ export interface RootRouteChildren {
   VerifyEmailRoute: typeof VerifyEmailRoute
   ApiPlansRoute: typeof ApiPlansRoute
   ApplyCampaignIdRoute: typeof ApplyCampaignIdRoute
+  PaymentFailedRoute: typeof PaymentFailedRoute
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   SessionCallbackRoute: typeof SessionCallbackRoute
   SessionSignoutRoute: typeof SessionSignoutRoute
@@ -460,6 +473,13 @@ declare module '@tanstack/react-router' {
       path: '/apply/$campaignId'
       fullPath: '/apply/$campaignId'
       preLoaderRoute: typeof ApplyCampaignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/failed': {
+      id: '/payment/failed'
+      path: '/payment/failed'
+      fullPath: '/payment/failed'
+      preLoaderRoute: typeof PaymentFailedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment/success': {
@@ -622,6 +642,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyEmailRoute: VerifyEmailRoute,
   ApiPlansRoute: ApiPlansRoute,
   ApplyCampaignIdRoute: ApplyCampaignIdRoute,
+  PaymentFailedRoute: PaymentFailedRoute,
   PaymentSuccessRoute: PaymentSuccessRoute,
   SessionCallbackRoute: SessionCallbackRoute,
   SessionSignoutRoute: SessionSignoutRoute,

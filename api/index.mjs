@@ -8,7 +8,12 @@ export const config = {
 
 export default async function handler(req, res) {
   try {
-    const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
+    // Vercel rewrites change the URL. Use x-matched-path to recover the original.
+    const originalPath = req.headers["x-matched-path"] || req.url;
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers.host || "localhost";
+    const url = new URL(originalPath, `${proto}://${host}`);
+
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
       if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : String(value));

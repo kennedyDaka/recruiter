@@ -68,7 +68,9 @@ export default async function handler(req, res) {
       const pool = getPool();
 
       const paymentResult = await pool.query(
-        "SELECT id, invoice_id, campaign_id, status FROM payments WHERE tx_ref = $1 LIMIT 1",
+        `SELECT p.id, p.invoice_id, p.status, i.campaign_id
+         FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id
+         WHERE p.tx_ref = $1 LIMIT 1`,
         [data.tx_ref]
       );
 
@@ -79,7 +81,7 @@ export default async function handler(req, res) {
 
       const payment = paymentResult.rows[0];
 
-      if (payment.status === "completed") {
+      if (payment.status === "completed" || payment.status === "paid") {
         return res.status(200).json({ received: true, note: "Already processed" });
       }
 

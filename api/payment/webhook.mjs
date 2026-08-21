@@ -1,14 +1,13 @@
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+import { Pool } from "pg";
 
-// Lazy-load pg to avoid cold-start issues
 let _pool = null;
-async function getPool() {
+function getPool() {
   if (_pool) return _pool;
-  const { Pool } = await import("pg");
   _pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
+    max: 2,
+    idleTimeoutMillis: 10000,
   });
   return _pool;
 }
@@ -28,7 +27,13 @@ export default async function handler(req, res) {
     for await (const chunk of req) chunks.push(chunk);
     const rawBody = Buffer.concat(chunks).toString("utf8");
 
-    const payload = JSON.parse(rawBody);
+    let payload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return res.status(400).json({ error: "Invalid JSON" });
+    }
+
     const signature = req.headers["x-paychangu-signature"] || "";
 
     // Verify HMAC signature
@@ -41,30 +46,27 @@ export default async function handler(req, res) {
     }
 
     if (webhookSecret) {
-      const crypto = await import("node:crypto");
-      const expectedHex = crypto
-        .createHmac("sha256", webhookSecret)
+      const { createHmac, timingSafeEqual } = await import("node:crypto");
+      const expectedHex = createHmac("sha256", webhookSecret)
         .update(rawBody)
         .digest("hex");
       const provided = Buffer.from(signature, "utf8");
       const expected = Buffer.from(expectedHex, "utf8");
       const valid =
         provided.length === expected.length &&
-        crypto.timingSafeEqual(provided, expected);
+        timingSafeEqual(provided, expected);
       if (!valid) {
         console.error("Webhook signature verification failed");
         return res.status(401).json({ error: "Invalid signature" });
       }
     }
 
-    // Process the event
     const event = payload.event;
     const data = payload.data;
 
     if (event === "charge.success" && data?.tx_ref) {
-      const pool = await getPool();
+      const pool = getPool();
 
-      // Find the payment record
       const paymentResult = await pool.query(
         "SELECT id, invoice_id, campaign_id, status FROM payments WHERE tx_ref = $1 LIMIT 1",
         [data.tx_ref]
@@ -81,18 +83,12 @@ export default async function handler(req, res) {
         return res.status(200).json({ received: true, note: "Already processed" });
       }
 
-      // Update payment status
       await pool.query(
-        `UPDATE payments SET
-          status = 'completed',
-          provider = 'paychangu',
-          provider_transaction_id = $1,
-          completed_at = NOW()
-        WHERE id = $2`,
+        `UPDATE payments SET status = 'completed', provider = 'paychangu',
+         provider_transaction_id = $1, completed_at = NOW() WHERE id = $2`,
         [data.id, payment.id]
       );
 
-      // Update invoice
       if (payment.invoice_id) {
         await pool.query(
           `UPDATE invoices SET status = 'paid', paid_at = NOW() WHERE id = $1`,
@@ -100,27 +96,22 @@ export default async function handler(req, res) {
         );
       }
 
-      // Activate campaign
       if (payment.campaign_id) {
         await pool.query(
-          `UPDATE campaigns SET
-            status = 'active',
-            published_at = COALESCE(published_at, NOW()),
-            updated_at = NOW()
-          WHERE id = $1`,
+          `UPDATE campaigns SET status = 'active',
+           published_at = COALESCE(published_at, NOW()), updated_at = NOW()
+           WHERE id = $1`,
           [payment.campaign_id]
         );
-
-        console.log(`Campaign ${payment.campaign_id} activated via webhook`);
+        console.log(`Campaign ${payment.campaign_id} activated`);
       }
 
       return res.status(200).json({ received: true });
     }
 
-    // For other events, just acknowledge
     return res.status(200).json({ received: true, event });
   } catch (error) {
-    console.error("Webhook error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("Webhook error:", error?.message, error?.stack);
+    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 }

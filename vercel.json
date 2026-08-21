@@ -1,20 +1,10 @@
 {
   "outputDirectory": ".",
+  "buildCommand": "NODE_ENV=production npx vite build",
   "rewrites": [
     {
       "source": "/((?!api/|_next/|assets/).*)",
       "destination": "/api"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
     }
   ]
 }

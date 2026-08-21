@@ -3,6 +3,7 @@ import server from "../dist/server/server.js";
 export const config = {
   runtime: "nodejs",
   maxDuration: 30,
+  includeFiles: ["../dist/**/*"],
 };
 
 export default async function handler(req, res) {

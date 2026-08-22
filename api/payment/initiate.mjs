@@ -154,9 +154,11 @@ export default async function handler(req, res) {
         first_name: firstName,
         last_name: lastName,
         email: customer.email,
-        callback_url: `${baseUrl}/api/payment/webhook?tx_ref=${txRef}&campaign_id=${campaignId}`,
-        return_url: `${baseUrl}/payment/success?tx_ref=${txRef}&campaign_id=${campaignId}`,
-        cancel_url: `${baseUrl}/payment/failed?tx_ref=${txRef}&campaign_id=${campaignId}&reason=cancelled`,
+        // Per PayChangu docs:
+        //   callback_url = redirect after SUCCESS (PayChangu appends ?tx_ref=XXX)
+        //   return_url   = redirect after CANCEL/FAILED (PayChangu appends ?tx_ref=XXX&status=failed)
+        callback_url: `${baseUrl}/api/payment/webhook`,
+        return_url: `${baseUrl}/payment/failed?campaign_id=${campaignId}`,
         customization: {
           title: "Operon Recruit",
           description: `${numDays}-day campaign activation`,

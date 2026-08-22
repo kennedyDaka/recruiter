@@ -81,15 +81,8 @@ function CampaignPayment() {
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
-        // Use a link click to ensure the browser allows the navigation
-        const a = document.createElement("a");
-        a.href = data.checkoutUrl;
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        toast.success("Redirecting to payment…");
+        // Navigate in the SAME window so PayChangu can redirect back to success/failed page
+        window.location.href = data.checkoutUrl;
       } else {
         toast.error("Failed to get checkout URL");
       }

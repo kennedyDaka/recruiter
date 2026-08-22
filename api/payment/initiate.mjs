@@ -136,6 +136,10 @@ export default async function handler(req, res) {
     const lastName = nameParts.slice(1).join(" ") || firstName;
 
     const apiUrl = process.env.PAYCHANGU_API_URL || "https://api.paychangu.com";
+    // Derive base URL from the request so it always matches the actual host
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers.host;
+    const baseUrl = process.env.APP_URL || `${proto}://${host}`;
     const paychanguResponse = await fetch(`${apiUrl}/payment`, {
       method: "POST",
       headers: {
@@ -150,9 +154,9 @@ export default async function handler(req, res) {
         first_name: firstName,
         last_name: lastName,
         email: customer.email,
-        callback_url: `${process.env.APP_URL}/api/payment/webhook`,
-        return_url: `${process.env.APP_URL}/payment/success?tx_ref=${txRef}&campaign_id=${campaignId}`,
-        cancel_url: `${process.env.APP_URL}/payment/failed?tx_ref=${txRef}&campaign_id=${campaignId}&reason=cancelled`,
+        callback_url: `${baseUrl}/api/payment/webhook`,
+        return_url: `${baseUrl}/payment/success?tx_ref=${txRef}&campaign_id=${campaignId}`,
+        cancel_url: `${baseUrl}/payment/failed?tx_ref=${txRef}&campaign_id=${campaignId}&reason=cancelled`,
         customization: {
           title: "Operon Recruit",
           description: `${numDays}-day campaign activation`,

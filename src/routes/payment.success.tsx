@@ -86,6 +86,21 @@ function PaymentSuccess() {
     ? `${window.location.origin}/apply/${publicToken}`
     : null;
 
+  // Build platform-specific share texts
+  const campaignName = campaign?.name || "";
+  const companyName = "Test Company Ltd";
+  const fullShareText = shareUrl
+    ? [
+        `📋 ${campaignName}`,
+        `🏢 ${companyName}`,
+        `📍 Lilongwe, Central, Malawi`,
+        ``,
+        `Apply here 👇`,
+        shareUrl,
+      ].join("\n")
+    : "";
+  const shortShareText = `${campaignName} at ${companyName}`;
+
   const copyLink = () => {
     if (shareUrl) {
       navigator.clipboard.writeText(shareUrl);
@@ -248,7 +263,7 @@ function PaymentSuccess() {
                 </Button>
               </div>
 
-              {/* Social Sharing with brand icons */}
+              {/* Social Sharing with brand icons — full vacancy text for WhatsApp/Facebook/LinkedIn, short for X */}
               <div className="space-y-2">
                 <p className="text-xs font-medium text-center text-muted-foreground">
                   Share vacancy to socials
@@ -259,8 +274,7 @@ function PaymentSuccess() {
                     variant="outline"
                     className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
                     onClick={() => {
-                      const text = encodeURIComponent(`To apply click the link below:\n\n${shareUrl}`);
-                      window.open(`https://wa.me/?text=${text}`, "_blank");
+                      window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, "_blank");
                     }}
                   >
                     <WhatsAppIcon className="h-4 w-4 mr-1.5" />
@@ -271,8 +285,7 @@ function PaymentSuccess() {
                     variant="outline"
                     className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
                     onClick={() => {
-                      const url = encodeURIComponent(shareUrl);
-                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank");
+                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl!)}&quote=${encodeURIComponent(fullShareText)}`, "_blank");
                     }}
                   >
                     <FacebookIcon className="h-4 w-4 mr-1.5" />
@@ -283,9 +296,7 @@ function PaymentSuccess() {
                     variant="outline"
                     className="bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200"
                     onClick={() => {
-                      const url = encodeURIComponent(shareUrl);
-                      const text = encodeURIComponent("To apply click the link below");
-                      window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, "_blank");
+                      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl!)}&text=${encodeURIComponent(shortShareText)}`, "_blank");
                     }}
                   >
                     <XIcon className="h-4 w-4 mr-1.5" />
@@ -296,8 +307,7 @@ function PaymentSuccess() {
                     variant="outline"
                     className="bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200"
                     onClick={() => {
-                      const url = encodeURIComponent(shareUrl);
-                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, "_blank");
+                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl!)}`, "_blank");
                     }}
                   >
                     <LinkedInIcon className="h-4 w-4 mr-1.5" />

@@ -180,15 +180,8 @@ function AuthPage() {
   async function handleGoogle() {
     const redirect = safePath(sessionStorage.getItem("operon:redirect") ?? destination);
     sessionStorage.setItem("operon:redirect", redirect);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth?redirect=${encodeURIComponent(redirect)}`,
-      },
-    });
-    if (error) {
-      toast.error("Google sign-in failed");
-    }
+    // Redirect to our server-side Google OAuth flow
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirect)}`;
   }
 
   async function signOutForNewWorkspace() {

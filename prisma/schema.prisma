@@ -80,7 +80,8 @@ model AuthAttempt {
 
 model AuthCredential {
   user_id       String   @id
-  password_hash String
+  password_hash String?
+  google_id     String?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 

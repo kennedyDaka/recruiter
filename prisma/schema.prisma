@@ -15,7 +15,9 @@ model Tenant {
   slug            String   @unique
   industry        String?
   country         String?
+  region          String?
   city            String?
+  currency        String?
   phone           String?
   email           String?
   website         String?

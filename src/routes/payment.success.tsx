@@ -43,7 +43,8 @@ function PaymentSuccess() {
     },
     enabled: !!campaignId,
     refetchInterval: (query) => {
-      if (query.state.data?.status === "active" && query.state.data?.public_token) return false;
+      const d = query.state.data;
+      if (d?.status === "active" && (d?.publicToken || d?.public_token)) return false;
       return 2000;
     },
   });
@@ -51,8 +52,10 @@ function PaymentSuccess() {
   const isPaid = paymentStatus?.status === "completed" || paymentStatus?.status === "paid";
   const isPending = paymentStatus?.status === "pending" || paymentStatus?.status === "processing";
   const isFailed = paymentStatus?.status === "failed";
-  const applyUrl = campaign?.public_token
-    ? `${window.location.origin}/apply/${campaign.public_token}`
+  // API returns camelCase, React checks camelCase
+  const publicToken = campaign?.publicToken || campaign?.public_token;
+  const applyUrl = publicToken
+    ? `${window.location.origin}/apply/${publicToken}`
     : null;
 
   const copyLink = () => {
@@ -216,6 +219,61 @@ function PaymentSuccess() {
                   )}
                 </Button>
               </div>
+
+              {/* Social Sharing */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-center text-muted-foreground">
+                  Share vacancy to socials
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                    onClick={() => {
+                      const text = encodeURIComponent(`To apply click the link below:\n\n${applyUrl}`);
+                      window.open(`https://wa.me/?text=${text}`, "_blank");
+                    }}
+                  >
+                    WhatsApp
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                    onClick={() => {
+                      const url = encodeURIComponent(applyUrl);
+                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank");
+                    }}
+                  >
+                    Facebook
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200"
+                    onClick={() => {
+                      const url = encodeURIComponent(applyUrl);
+                      const text = encodeURIComponent("To apply click the link below");
+                      window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, "_blank");
+                    }}
+                  >
+                    Twitter / X
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200"
+                    onClick={() => {
+                      const url = encodeURIComponent(applyUrl);
+                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, "_blank");
+                    }}
+                  >
+                    LinkedIn
+                  </Button>
+                </div>
+              </div>
+
               <Button asChild className="w-full" size="lg">
                 <a href={applyUrl} target="_blank" rel="noopener">
                   Open Application Page

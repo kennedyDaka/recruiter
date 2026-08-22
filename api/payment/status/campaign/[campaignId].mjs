@@ -47,9 +47,12 @@ export default async function handler(req, res) {
       id: row.id,
       name: row.name,
       status: row.status,
+      public_token: row.public_token,
       publicToken: row.public_token,
       closingDate: row.closing_date,
+      closing_date: row.closing_date,
       publishedAt: row.published_at,
+      published_at: row.published_at,
     });
   } catch (error) {
     console.error("Campaign status error:", error?.message);

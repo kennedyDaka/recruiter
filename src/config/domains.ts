@@ -37,6 +37,11 @@ export const DOMAIN_CONFIG = {
   PAYCHANGU_CANCEL_URL:
     process.env.PAYCHANGU_CANCEL_URL ||
     "https://operon-recruit-psi.vercel.app/payment/failed",
+
+  /** LinkedIn OAuth redirect (must match LinkedIn App Console) */
+  LINKEDIN_REDIRECT_URI:
+    process.env.LINKEDIN_REDIRECT_URI ||
+    "https://operon-recruit-psi.vercel.app/api/auth/linkedin/callback",
 } as const;
 
 /**

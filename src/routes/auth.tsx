@@ -241,6 +241,46 @@ function AuthPage() {
                 </Button>
               </div>
             </div>
+          ) : showConfirmNotice && signupDone ? (
+            /* After successful signup: replace the entire form with a prominent confirmation notice */
+            <div className="mt-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-8 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">
+                ✉️
+              </div>
+              <h2 className="text-xl font-bold text-emerald-900">Check your inbox!</h2>
+              <p className="mt-3 text-base leading-relaxed text-emerald-800">
+                We sent a verification link to <span className="font-semibold">{email}</span>.
+              </p>
+              <p className="mt-2 text-sm text-emerald-700">
+                Click the link in the email to activate your account, then sign in.
+              </p>
+              <p className="mt-2 text-xs text-emerald-600">
+                Didn't get it? Check your spam folder or click below to resend.
+              </p>
+              <div className="mt-6 flex flex-col gap-3">
+                <Button
+                  type="button"
+                  variant="default"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  disabled={resending}
+                  onClick={resendConfirmation}
+                >
+                  {resending ? "Sending…" : "Resend verification email"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowConfirmNotice(false);
+                    setSignupDone(false);
+                    setMode("signin");
+                  }}
+                >
+                  Back to sign in
+                </Button>
+              </div>
+            </div>
           ) : (
             <>
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -333,13 +373,11 @@ function AuthPage() {
                 </Button>
               </form>
 
-              {showConfirmNotice ? (
+              {showConfirmNotice && !signupDone ? (
                 <div className="mt-5 rounded-lg border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-900">
                   <p className="font-semibold">Confirm your email</p>
                   <p className="mt-1 leading-relaxed">
-                    {signupDone
-                      ? "Account created — we sent a verification link to your inbox. Click it to activate your account, then sign in."
-                      : "Your account exists but its email hasn't been confirmed yet. Check your inbox (and spam folder) for the verification link, then sign in again."}
+                    Your account exists but its email hasn't been confirmed yet. Check your inbox (and spam folder) for the verification link, then sign in again.
                   </p>
                   <Button
                     type="button"

@@ -31,12 +31,14 @@ import { Route as AuthenticatedApplicationsApplicationIdRouteImport } from './ro
 import { Route as AuthenticatedCampaignsIndexRouteImport } from './routes/_authenticated/campaigns.index'
 import { Route as AuthenticatedCampaignsCampaignIdRouteImport } from './routes/_authenticated/campaigns.$campaignId'
 import { Route as AuthenticatedCampaignsNewRouteImport } from './routes/_authenticated/campaigns.new'
+import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as ApiCampaignsCampaignIdRouteImport } from './routes/api/campaigns.$campaignId'
 import { Route as ApiPaymentInitiateRouteImport } from './routes/api/payment/initiate'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
 import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './routes/_authenticated/campaigns.$campaignId.index'
 import { Route as AuthenticatedCampaignsCampaignIdExtendRouteImport } from './routes/_authenticated/campaigns.$campaignId.extend'
 import { Route as AuthenticatedCampaignsCampaignIdPayRouteImport } from './routes/_authenticated/campaigns.$campaignId.pay'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google.callback'
 import { Route as ApiPaymentStatusTxRefRouteImport } from './routes/api/payment/status.$txRef'
 import { Route as ApiPaymentStatusCampaignCampaignIdRouteImport } from './routes/api/payment/status/campaign.$campaignId'
 
@@ -153,6 +155,11 @@ const AuthenticatedCampaignsNewRoute =
     path: '/campaigns/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
+  id: '/api/auth/google',
+  path: '/api/auth/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCampaignsCampaignIdRoute = ApiCampaignsCampaignIdRouteImport.update({
   id: '/api/campaigns/$campaignId',
   path: '/api/campaigns/$campaignId',
@@ -186,6 +193,11 @@ const AuthenticatedCampaignsCampaignIdPayRoute =
     path: '/pay',
     getParentRoute: () => AuthenticatedCampaignsCampaignIdRoute,
   } as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiAuthGoogleRoute,
+} as any)
 const ApiPaymentStatusTxRefRoute = ApiPaymentStatusTxRefRouteImport.update({
   id: '/api/payment/status/$txRef',
   path: '/api/payment/status/$txRef',
@@ -219,12 +231,14 @@ export interface FileRoutesByFullPath {
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -249,12 +263,14 @@ export interface FileRoutesByTo {
   '/share/$publicToken': typeof SharePublicTokenRoute
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/campaigns': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -282,12 +298,14 @@ export interface FileRoutesById {
   '/_authenticated/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/_authenticated/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/_authenticated/campaigns/new': typeof AuthenticatedCampaignsNewRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/_authenticated/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/_authenticated/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/_authenticated/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/_authenticated/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -315,12 +333,14 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/campaigns/$campaignId'
     | '/campaigns/new'
+    | '/api/auth/google'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/campaigns/'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
+    | '/api/auth/google/callback'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -345,12 +365,14 @@ export interface FileRouteTypes {
     | '/share/$publicToken'
     | '/applications/$applicationId'
     | '/campaigns/new'
+    | '/api/auth/google'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/campaigns'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
+    | '/api/auth/google/callback'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId'
     | '/api/payment/status/campaign/$campaignId'
@@ -377,12 +399,14 @@ export interface FileRouteTypes {
     | '/_authenticated/applications/$applicationId'
     | '/_authenticated/campaigns/$campaignId'
     | '/_authenticated/campaigns/new'
+    | '/api/auth/google'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/_authenticated/campaigns/'
     | '/_authenticated/campaigns/$campaignId/extend'
     | '/_authenticated/campaigns/$campaignId/pay'
+    | '/api/auth/google/callback'
     | '/api/payment/status/$txRef'
     | '/_authenticated/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -402,6 +426,7 @@ export interface RootRouteChildren {
   SessionCallbackRoute: typeof SessionCallbackRoute
   SessionSignoutRoute: typeof SessionSignoutRoute
   SharePublicTokenRoute: typeof SharePublicTokenRoute
+  ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiCampaignsCampaignIdRoute: typeof ApiCampaignsCampaignIdRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
@@ -565,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampaignsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/auth/google': {
+      id: '/api/auth/google'
+      path: '/api/auth/google'
+      fullPath: '/api/auth/google'
+      preLoaderRoute: typeof ApiAuthGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/campaigns/$campaignId': {
       id: '/api/campaigns/$campaignId'
       path: '/api/campaigns/$campaignId'
@@ -606,6 +638,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/campaigns/$campaignId/pay'
       preLoaderRoute: typeof AuthenticatedCampaignsCampaignIdPayRouteImport
       parentRoute: typeof AuthenticatedCampaignsCampaignIdRoute
+    }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof ApiAuthGoogleRoute
     }
     '/api/payment/status/$txRef': {
       id: '/api/payment/status/$txRef'
@@ -674,6 +713,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface ApiAuthGoogleRouteChildren {
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+}
+
+const ApiAuthGoogleRouteChildren: ApiAuthGoogleRouteChildren = {
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+}
+
+const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
+  ApiAuthGoogleRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -688,6 +739,7 @@ const rootRouteChildren: RootRouteChildren = {
   SessionCallbackRoute: SessionCallbackRoute,
   SessionSignoutRoute: SessionSignoutRoute,
   SharePublicTokenRoute: SharePublicTokenRoute,
+  ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiCampaignsCampaignIdRoute: ApiCampaignsCampaignIdRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,

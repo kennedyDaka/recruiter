@@ -26,6 +26,7 @@ import { Route as PaymentFailedRouteImport } from './routes/payment.failed'
 import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
 import { Route as SessionCallbackRouteImport } from './routes/session.callback'
 import { Route as SessionSignoutRouteImport } from './routes/session.signout'
+import { Route as SharePublicTokenRouteImport } from './routes/share.$publicToken'
 import { Route as AuthenticatedApplicationsApplicationIdRouteImport } from './routes/_authenticated/applications.$applicationId'
 import { Route as AuthenticatedCampaignsIndexRouteImport } from './routes/_authenticated/campaigns.index'
 import { Route as AuthenticatedCampaignsCampaignIdRouteImport } from './routes/_authenticated/campaigns.$campaignId'
@@ -37,6 +38,7 @@ import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './rou
 import { Route as AuthenticatedCampaignsCampaignIdExtendRouteImport } from './routes/_authenticated/campaigns.$campaignId.extend'
 import { Route as AuthenticatedCampaignsCampaignIdPayRouteImport } from './routes/_authenticated/campaigns.$campaignId.pay'
 import { Route as ApiPaymentStatusTxRefRouteImport } from './routes/api/payment/status.$txRef'
+import { Route as ApiPaymentStatusCampaignCampaignIdRouteImport } from './routes/api/payment/status/campaign.$campaignId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -122,6 +124,11 @@ const SessionSignoutRoute = SessionSignoutRouteImport.update({
   path: '/session/signout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SharePublicTokenRoute = SharePublicTokenRouteImport.update({
+  id: '/share/$publicToken',
+  path: '/share/$publicToken',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedApplicationsApplicationIdRoute =
   AuthenticatedApplicationsApplicationIdRouteImport.update({
     id: '/applications/$applicationId',
@@ -184,6 +191,12 @@ const ApiPaymentStatusTxRefRoute = ApiPaymentStatusTxRefRouteImport.update({
   path: '/api/payment/status/$txRef',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPaymentStatusCampaignCampaignIdRoute =
+  ApiPaymentStatusCampaignCampaignIdRouteImport.update({
+    id: '/api/payment/status/campaign/$campaignId',
+    path: '/api/payment/status/campaign/$campaignId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -202,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
+  '/share/$publicToken': typeof SharePublicTokenRoute
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
@@ -213,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
+  '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -231,6 +246,7 @@ export interface FileRoutesByTo {
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
+  '/share/$publicToken': typeof SharePublicTokenRoute
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
@@ -241,6 +257,7 @@ export interface FileRoutesByTo {
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdIndexRoute
+  '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -261,6 +278,7 @@ export interface FileRoutesById {
   '/payment/success': typeof PaymentSuccessRoute
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
+  '/share/$publicToken': typeof SharePublicTokenRoute
   '/_authenticated/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/_authenticated/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/_authenticated/campaigns/new': typeof AuthenticatedCampaignsNewRoute
@@ -272,6 +290,7 @@ export interface FileRoutesById {
   '/_authenticated/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/_authenticated/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
+  '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -292,6 +311,7 @@ export interface FileRouteTypes {
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
+    | '/share/$publicToken'
     | '/applications/$applicationId'
     | '/campaigns/$campaignId'
     | '/campaigns/new'
@@ -303,6 +323,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId/pay'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId/'
+    | '/api/payment/status/campaign/$campaignId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -321,6 +342,7 @@ export interface FileRouteTypes {
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
+    | '/share/$publicToken'
     | '/applications/$applicationId'
     | '/campaigns/new'
     | '/api/campaigns/$campaignId'
@@ -331,6 +353,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId/pay'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId'
+    | '/api/payment/status/campaign/$campaignId'
   id:
     | '__root__'
     | '/'
@@ -350,6 +373,7 @@ export interface FileRouteTypes {
     | '/payment/success'
     | '/session/callback'
     | '/session/signout'
+    | '/share/$publicToken'
     | '/_authenticated/applications/$applicationId'
     | '/_authenticated/campaigns/$campaignId'
     | '/_authenticated/campaigns/new'
@@ -361,6 +385,7 @@ export interface FileRouteTypes {
     | '/_authenticated/campaigns/$campaignId/pay'
     | '/api/payment/status/$txRef'
     | '/_authenticated/campaigns/$campaignId/'
+    | '/api/payment/status/campaign/$campaignId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -376,10 +401,12 @@ export interface RootRouteChildren {
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   SessionCallbackRoute: typeof SessionCallbackRoute
   SessionSignoutRoute: typeof SessionSignoutRoute
+  SharePublicTokenRoute: typeof SharePublicTokenRoute
   ApiCampaignsCampaignIdRoute: typeof ApiCampaignsCampaignIdRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
   ApiPaymentStatusTxRefRoute: typeof ApiPaymentStatusTxRefRoute
+  ApiPaymentStatusCampaignCampaignIdRoute: typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -503,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionSignoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/share/$publicToken': {
+      id: '/share/$publicToken'
+      path: '/share/$publicToken'
+      fullPath: '/share/$publicToken'
+      preLoaderRoute: typeof SharePublicTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/applications/$applicationId': {
       id: '/_authenticated/applications/$applicationId'
       path: '/applications/$applicationId'
@@ -580,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentStatusTxRefRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/payment/status/campaign/$campaignId': {
+      id: '/api/payment/status/campaign/$campaignId'
+      path: '/api/payment/status/campaign/$campaignId'
+      fullPath: '/api/payment/status/campaign/$campaignId'
+      preLoaderRoute: typeof ApiPaymentStatusCampaignCampaignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -646,10 +687,13 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentSuccessRoute: PaymentSuccessRoute,
   SessionCallbackRoute: SessionCallbackRoute,
   SessionSignoutRoute: SessionSignoutRoute,
+  SharePublicTokenRoute: SharePublicTokenRoute,
   ApiCampaignsCampaignIdRoute: ApiCampaignsCampaignIdRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,
   ApiPaymentStatusTxRefRoute: ApiPaymentStatusTxRefRoute,
+  ApiPaymentStatusCampaignCampaignIdRoute:
+    ApiPaymentStatusCampaignCampaignIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

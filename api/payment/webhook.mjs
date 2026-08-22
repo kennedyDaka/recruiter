@@ -18,6 +18,44 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  // PayChangu redirects the user's browser to callback_url via GET after payment.
+  // Redirect those browser requests to our success/failed page instead.
+  if (req.method === "GET") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const txRef = url.searchParams.get("tx_ref") || "";
+
+    if (!txRef) {
+      return res.redirect(302, "/payment/failed?reason=missing_reference");
+    }
+
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT p.status, p.invoice_id, i.campaign_id
+         FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id
+         WHERE p.tx_ref = $1 LIMIT 1`,
+        [txRef]
+      );
+
+      if (result.rows.length === 0) {
+        return res.redirect(302, `/payment/failed?tx_ref=${encodeURIComponent(txRef)}&reason=unknown_transaction`);
+      }
+
+      const payment = result.rows[0];
+      const campaignId = payment.campaign_id || "";
+      const isPaid = payment.status === "completed" || payment.status === "paid";
+
+      if (isPaid) {
+        return res.redirect(302, `/payment/success?tx_ref=${encodeURIComponent(txRef)}&campaign_id=${encodeURIComponent(campaignId)}`);
+      } else {
+        return res.redirect(302, `/payment/failed?tx_ref=${encodeURIComponent(txRef)}&campaign_id=${encodeURIComponent(campaignId)}&reason=not_confirmed`);
+      }
+    } catch (error) {
+      console.error("GET redirect error:", error?.message);
+      return res.redirect(302, `/payment/success?tx_ref=${encodeURIComponent(txRef)}`);
+    }
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

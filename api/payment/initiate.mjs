@@ -154,7 +154,7 @@ export default async function handler(req, res) {
         first_name: firstName,
         last_name: lastName,
         email: customer.email,
-        callback_url: `${baseUrl}/api/payment/webhook`,
+        callback_url: `${baseUrl}/api/payment/webhook?tx_ref=${txRef}&campaign_id=${campaignId}`,
         return_url: `${baseUrl}/payment/success?tx_ref=${txRef}&campaign_id=${campaignId}`,
         cancel_url: `${baseUrl}/payment/failed?tx_ref=${txRef}&campaign_id=${campaignId}&reason=cancelled`,
         customization: {

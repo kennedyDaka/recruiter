@@ -247,7 +247,7 @@ export const signUpFn = createServerFn({ method: "POST" })
     const token = newVerifyToken();
 
     await dbExecute(
-      "INSERT INTO profiles (id, full_name, email, email_verified, verify_token, verify_expires_at, updated_at) VALUES (?, ?, ?, 0, ?, ?, ?)",
+      "INSERT INTO profiles (id, full_name, email, email_verified, verify_token, verify_expires_at, updated_at) VALUES (?, ?, ?, false, ?, ?, ?)",
       [userId, data.fullName, data.email, token, new Date(Date.now() + EMAIL_VERIFY_TTL_MS).toISOString(), new Date().toISOString()],
     );
     await dbExecute("INSERT INTO auth_credentials (user_id, password_hash, updated_at) VALUES (?, ?, ?)", [
@@ -391,7 +391,7 @@ export const verifyEmailFn = createServerFn({ method: "POST" })
     }
 
     await dbExecute(
-      "UPDATE profiles SET email_verified = 1, verify_token = NULL, verify_expires_at = NULL WHERE id = ?",
+      "UPDATE profiles SET email_verified = true, verify_token = NULL, verify_expires_at = NULL WHERE id = ?",
       [profile.id],
     );
     await clearFailedAttempts(profile.email);

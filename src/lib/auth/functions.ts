@@ -129,7 +129,7 @@ async function sendPasswordResetEmail(args: {
     reset_url: `${base.replace(/\/+$/, "")}/reset-password?token=${encodeURIComponent(args.token)}`,
   });
   const result = await sendEmail(
-    { to: args.to, subject: rendered.subject, text: rendered.body },
+    { to: args.to, subject: rendered.subject, text: rendered.body, html: rendered.html },
     resolveEmailConfig(null),
   );
   if (!result.ok) {
@@ -155,7 +155,7 @@ async function sendVerificationEmail(args: {
     verify_url: `${base.replace(/\/+$/, "")}/verify-email?token=${encodeURIComponent(args.token)}`,
   });
   const result = await sendEmail(
-    { to: args.to, subject: rendered.subject, text: rendered.body },
+    { to: args.to, subject: rendered.subject, text: rendered.body, html: rendered.html },
     resolveEmailConfig(null),
   );
   if (!result.ok) {

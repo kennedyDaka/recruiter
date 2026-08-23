@@ -31,6 +31,8 @@ export type SendEmailInput = {
   to: string;
   subject: string;
   text: string;
+  /** Optional HTML body — when present, the email is sent as multipart (HTML + text fallback). */
+  html?: string;
   /** Optional per-send override; falls back to the resolved config "from". */
   from?: string;
 };
@@ -172,6 +174,7 @@ async function sendViaSmtp(
       to: input.to,
       subject: input.subject,
       text: input.text,
+      ...(input.html ? { html: input.html } : {}),
     });
     return { ok: true, provider: "smtp", messageId: String(info.messageId ?? "") };
   } catch (error) {
@@ -199,6 +202,7 @@ async function sendViaResend(
         to: [input.to],
         subject: input.subject,
         text: input.text,
+        ...(input.html ? { html: input.html } : {}),
       }),
     });
     if (!response.ok) {

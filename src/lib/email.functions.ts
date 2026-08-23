@@ -234,6 +234,7 @@ export const sendBulkEmailsFn = createServerFn({ method: "POST" })
         template: data.template,
         subject: rendered.subject,
         body: rendered.body,
+        html_body: rendered.html,
         recipient: email,
         status: "queued",
       });

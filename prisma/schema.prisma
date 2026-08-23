@@ -474,6 +474,7 @@ model Communication {
   template       String?
   subject        String?
   body           String?
+  html_body      String?
   recipient      String?
   status         String   @default("queued")
   error          String?

@@ -542,6 +542,7 @@ export const submitApplication = createServerFn({ method: "POST" })
         template: "application_received",
         subject: receivedMail.subject,
         body: receivedMail.body,
+        html_body: receivedMail.html,
         recipient: data.personal.email,
         status: "queued",
       });

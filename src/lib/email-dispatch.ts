@@ -90,8 +90,12 @@ export async function dispatchCommunication(
   };
 
   const tenantConfig = await tenantEmailConfig(tenantId, supabase);
+
+  // Use pre-rendered HTML body when stored with the communication.
+  const htmlBody = (row["html_body"] as string) || undefined;
+
   const result = await sendEmail(
-    { to: recipient, subject, text: body },
+    { to: recipient, subject, text: body, html: htmlBody },
     tenantConfig,
   );
 

@@ -136,6 +136,7 @@ async function enqueueStatusEmail(
     template: args.template,
     subject: channel === "email" ? rendered.subject : null,
     body: rendered.body,
+    html_body: channel === "email" ? rendered.html : null,
     recipient,
     status: "queued",
   });

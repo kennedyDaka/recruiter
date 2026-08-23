@@ -159,6 +159,7 @@ export async function applyAutoPipeline(args: {
         template,
         subject: rendered.subject,
         body: rendered.body,
+        html_body: rendered.html,
         recipient: candidate.email,
         status: "queued",
       });

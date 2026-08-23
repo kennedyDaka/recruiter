@@ -278,7 +278,13 @@ export const dbQueryProxy = createServerFn({ method: "POST" })
     if (TENANT_SCOPED_TABLES.has(data.table)) {
       const isPublicIntent =
         whereFragments.some((f) => f.sql === "public_token = ?") ||
-        (data.table !== "campaigns" && whereFragments.some((f) => f.sql === "campaign_id = ?"));
+        // campaign_id filter is only 'public intent' for tables that support
+        // anonymous public reads (questions/options). For applications,
+        // candidates, etc. a signed-in user's campaign_id filter goes through
+        // the normal tenant-scoped path instead.
+        (ANONYMOUS_READABLE_TENANT_TABLES.has(data.table) &&
+          data.table !== "campaigns" &&
+          whereFragments.some((f) => f.sql === "campaign_id = ?"));
 
       if (session && !isPublicIntent) {
         // Signed-in read of tenant-owned data: the tenant is always the

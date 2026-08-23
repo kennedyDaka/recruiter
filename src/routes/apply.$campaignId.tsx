@@ -1149,6 +1149,7 @@ function ApplyPage() {
         file_name: string;
         file_path: string;
         file_size: number;
+        file_data?: string;
       }[] = [];
       for (const [docType, file] of Object.entries(uploadedFiles)) {
         if (!file) continue;
@@ -1165,6 +1166,7 @@ function ApplyPage() {
           file_name: uploaded.file_name,
           file_path: uploaded.file_path,
           file_size: uploaded.file_size,
+          ...(uploaded.file_data ? { file_data: uploaded.file_data } : {}),
         });
       }
 

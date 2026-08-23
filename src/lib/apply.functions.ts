@@ -53,6 +53,7 @@ const documentSchema = z.object({
     .max(10 * 1024 * 1024)
     .optional()
     .default(0),
+  file_data: z.string().max(16_000_000).optional(),
 });
 
 const submitSchema = z.object({

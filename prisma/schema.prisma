@@ -315,6 +315,7 @@ model CandidateDocument {
   file_path      String
   file_size      Int      @default(0)
   storage_key    String?
+  file_data      String?
   uploaded_at    DateTime @default(now())
 
   application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)

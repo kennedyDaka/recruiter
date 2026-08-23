@@ -198,7 +198,7 @@ function htmlEmailVerification(v: Record<string, string>): string {
       ${heading("Confirm Your Email")}
       ${paragraph(`Hello <strong>${v.first_name}</strong>,`)}
       ${paragraph("Thank you for creating your Operon Recruit account. Please click the button below to confirm your email address and activate your account.")}
-      ${ctaButton("Confirm Email Address", v.verify_url)}
+      ${ctaButton("Confirm Email Address", v.verify_url ?? "#")}
       ${divider()}
       ${infoBox("This link expires in <strong>24 hours</strong>. If you did not create this account, you can safely ignore this email.", "warning")}
       ${paragraph("Best regards,", { mt: 20 })}
@@ -214,7 +214,7 @@ function htmlPasswordReset(v: Record<string, string>): string {
       ${heading("Reset Your Password")}
       ${paragraph(`Hello <strong>${v.first_name}</strong>,`)}
       ${paragraph("We received a request to reset the password for your Operon Recruit account. Click the button below to choose a new password.")}
-      ${ctaButton("Reset Password", v.reset_url)}
+      ${ctaButton("Reset Password", v.reset_url ?? "#")}
       ${divider()}
       ${infoBox("This link expires in <strong>1 hour</strong>. If you did not request a password reset, you can safely ignore this email — your password will not change.", "warning")}
       ${paragraph("Best regards,", { mt: 20 })}

@@ -94,10 +94,14 @@ export async function dispatchCommunication(
   // Use pre-rendered HTML body when stored with the communication.
   const htmlBody = (row["html_body"] as string) || undefined;
 
-  const result = await sendEmail(
-    { to: recipient, subject, text: body, html: htmlBody },
-    tenantConfig,
-  );
+  const emailInput: import("@/lib/email-provider").SendEmailInput = {
+    to: recipient,
+    subject,
+    text: body,
+  };
+  if (htmlBody) emailInput.html = htmlBody;
+
+  const result = await sendEmail(emailInput, tenantConfig);
 
   if (result.ok) {
     await supabase

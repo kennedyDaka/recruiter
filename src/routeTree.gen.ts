@@ -32,6 +32,7 @@ import { Route as AuthenticatedCampaignsIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedCampaignsCampaignIdRouteImport } from './routes/_authenticated/campaigns.$campaignId'
 import { Route as AuthenticatedCampaignsNewRouteImport } from './routes/_authenticated/campaigns.new'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
+import { Route as ApiAuthLinkedinRouteImport } from './routes/api/auth/linkedin'
 import { Route as ApiCampaignsCampaignIdRouteImport } from './routes/api/campaigns.$campaignId'
 import { Route as ApiPaymentInitiateRouteImport } from './routes/api/payment/initiate'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
@@ -39,6 +40,7 @@ import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './rou
 import { Route as AuthenticatedCampaignsCampaignIdExtendRouteImport } from './routes/_authenticated/campaigns.$campaignId.extend'
 import { Route as AuthenticatedCampaignsCampaignIdPayRouteImport } from './routes/_authenticated/campaigns.$campaignId.pay'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google.callback'
+import { Route as ApiAuthLinkedinCallbackRouteImport } from './routes/api/auth/linkedin.callback'
 import { Route as ApiPaymentStatusTxRefRouteImport } from './routes/api/payment/status.$txRef'
 import { Route as ApiPaymentStatusCampaignCampaignIdRouteImport } from './routes/api/payment/status/campaign.$campaignId'
 
@@ -160,6 +162,11 @@ const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
   path: '/api/auth/google',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthLinkedinRoute = ApiAuthLinkedinRouteImport.update({
+  id: '/api/auth/linkedin',
+  path: '/api/auth/linkedin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCampaignsCampaignIdRoute = ApiCampaignsCampaignIdRouteImport.update({
   id: '/api/campaigns/$campaignId',
   path: '/api/campaigns/$campaignId',
@@ -198,6 +205,11 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGoogleRoute,
 } as any)
+const ApiAuthLinkedinCallbackRoute = ApiAuthLinkedinCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiAuthLinkedinRoute,
+} as any)
 const ApiPaymentStatusTxRefRoute = ApiPaymentStatusTxRefRouteImport.update({
   id: '/api/payment/status/$txRef',
   path: '/api/payment/status/$txRef',
@@ -232,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -239,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -264,6 +278,7 @@ export interface FileRoutesByTo {
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -271,6 +286,7 @@ export interface FileRoutesByTo {
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -299,6 +315,7 @@ export interface FileRoutesById {
   '/_authenticated/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/_authenticated/campaigns/new': typeof AuthenticatedCampaignsNewRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -306,6 +323,7 @@ export interface FileRoutesById {
   '/_authenticated/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/_authenticated/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/_authenticated/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -334,6 +352,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/campaigns/new'
     | '/api/auth/google'
+    | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
@@ -341,6 +360,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
+    | '/api/auth/linkedin/callback'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -366,6 +386,7 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/campaigns/new'
     | '/api/auth/google'
+    | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
@@ -373,6 +394,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
+    | '/api/auth/linkedin/callback'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId'
     | '/api/payment/status/campaign/$campaignId'
@@ -400,6 +422,7 @@ export interface FileRouteTypes {
     | '/_authenticated/campaigns/$campaignId'
     | '/_authenticated/campaigns/new'
     | '/api/auth/google'
+    | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
@@ -407,6 +430,7 @@ export interface FileRouteTypes {
     | '/_authenticated/campaigns/$campaignId/extend'
     | '/_authenticated/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
+    | '/api/auth/linkedin/callback'
     | '/api/payment/status/$txRef'
     | '/_authenticated/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -427,6 +451,7 @@ export interface RootRouteChildren {
   SessionSignoutRoute: typeof SessionSignoutRoute
   SharePublicTokenRoute: typeof SharePublicTokenRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
+  ApiAuthLinkedinRoute: typeof ApiAuthLinkedinRouteWithChildren
   ApiCampaignsCampaignIdRoute: typeof ApiCampaignsCampaignIdRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
@@ -597,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/linkedin': {
+      id: '/api/auth/linkedin'
+      path: '/api/auth/linkedin'
+      fullPath: '/api/auth/linkedin'
+      preLoaderRoute: typeof ApiAuthLinkedinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/campaigns/$campaignId': {
       id: '/api/campaigns/$campaignId'
       path: '/api/campaigns/$campaignId'
@@ -645,6 +677,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/google/callback'
       preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
       parentRoute: typeof ApiAuthGoogleRoute
+    }
+    '/api/auth/linkedin/callback': {
+      id: '/api/auth/linkedin/callback'
+      path: '/callback'
+      fullPath: '/api/auth/linkedin/callback'
+      preLoaderRoute: typeof ApiAuthLinkedinCallbackRouteImport
+      parentRoute: typeof ApiAuthLinkedinRoute
     }
     '/api/payment/status/$txRef': {
       id: '/api/payment/status/$txRef'
@@ -725,6 +764,18 @@ const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
   ApiAuthGoogleRouteChildren,
 )
 
+interface ApiAuthLinkedinRouteChildren {
+  ApiAuthLinkedinCallbackRoute: typeof ApiAuthLinkedinCallbackRoute
+}
+
+const ApiAuthLinkedinRouteChildren: ApiAuthLinkedinRouteChildren = {
+  ApiAuthLinkedinCallbackRoute: ApiAuthLinkedinCallbackRoute,
+}
+
+const ApiAuthLinkedinRouteWithChildren = ApiAuthLinkedinRoute._addFileChildren(
+  ApiAuthLinkedinRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -740,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   SessionSignoutRoute: SessionSignoutRoute,
   SharePublicTokenRoute: SharePublicTokenRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
+  ApiAuthLinkedinRoute: ApiAuthLinkedinRouteWithChildren,
   ApiCampaignsCampaignIdRoute: ApiCampaignsCampaignIdRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,

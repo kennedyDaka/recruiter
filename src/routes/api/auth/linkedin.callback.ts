@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Pool } from "pg";
 import crypto from "crypto";
 
@@ -65,7 +65,7 @@ async function findOrCreateLinkedInUser(
   },
 ) {
   const existing = await pool.query(
-    "SELECT id, tenant_id, full_name, email, email_verified FROM profiles WHERE lower(email) = lower($1)",
+    "SELECT id, tenant_id, full_name, email, email_verified, session_version FROM profiles WHERE lower(email) = lower($1)",
     [email],
   );
 
@@ -88,9 +88,9 @@ async function findOrCreateLinkedInUser(
 
   const userId = crypto.randomUUID();
   const insertResult = await pool.query(
-    `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, updated_at)
-     VALUES ($1, $2, $3, true, $4, NOW())
-     RETURNING id, tenant_id, full_name, email, email_verified`,
+    `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, session_version, updated_at)
+     VALUES ($1, $2, $3, true, $4, 0, NOW())
+     RETURNING id, tenant_id, full_name, email, email_verified, session_version`,
     [userId, fullName, email, avatarUrl || null],
   );
 
@@ -103,91 +103,129 @@ async function findOrCreateLinkedInUser(
   return insertResult.rows[0];
 }
 
+/** Validate redirect destination to prevent open-redirect attacks. */
+function safeRedirectPath(dest: string | null | undefined): string {
+  if (!dest || typeof dest !== "string") return "/dashboard";
+  const trimmed = dest.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "/dashboard";
+  if (trimmed.includes("\r") || trimmed.includes("\n")) return "/dashboard";
+  if (trimmed.length > 2048) return "/dashboard";
+  return trimmed;
+}
+
 export const Route = createFileRoute("/api/auth/linkedin/callback")({
   server: {
-    loaders: async ({ request }) => {
-      const url = new URL(request.url);
-      const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state");
-      const error = url.searchParams.get("error");
+    handlers: {
+      GET: async ({ request }) => {
+        try {
+          const url = new URL(request.url);
+          const code = url.searchParams.get("code");
+          const state = url.searchParams.get("state");
+          const linkedinError = url.searchParams.get("error");
 
-      if (error) {
-        throw redirect({ to: "/auth", search: { mode: "signin" } });
-      }
+          if (linkedinError) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: `/auth?error=${encodeURIComponent(linkedinError)}` },
+            });
+          }
 
-      if (!code) {
-        throw redirect({ to: "/auth", search: { mode: "signin" } });
-      }
+          if (!code) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: "/auth?error=missing_code" },
+            });
+          }
 
-      const clientId = process.env.LINKEDIN_CLIENT_ID;
-      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-      if (!clientId || !clientSecret) {
-        throw redirect({ to: "/auth", search: { mode: "signin" } });
-      }
+          const clientId = process.env.LINKEDIN_CLIENT_ID;
+          const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+          if (!clientId || !clientSecret) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: "/auth?error=linkedin_not_configured" },
+            });
+          }
 
-      const proto = url.protocol.replace(":", "");
-      const host = url.host;
-      const origin = `${proto}://${host}`;
-      const redirectUri = `${origin}/api/auth/linkedin/callback`;
+          const proto = url.protocol.replace(":", "");
+          const host = url.host;
+          const origin = `${proto}://${host}`;
+          const redirectUri = `${origin}/api/auth/linkedin/callback`;
 
-      // Exchange code for access token
-      const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code",
-        }),
-      });
+          // Exchange code for access token
+          const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              code,
+              client_id: clientId,
+              client_secret: clientSecret,
+              redirect_uri: redirectUri,
+              grant_type: "authorization_code",
+            }),
+          });
 
-      const tokenData = await tokenRes.json();
-      if (!tokenData.access_token) {
-        throw redirect({ to: "/auth", search: { mode: "signin" } });
-      }
+          const tokenData = await tokenRes.json();
+          if (!tokenData.access_token) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: "/auth?error=linkedin_token_exchange_failed" },
+            });
+          }
 
-      // Get user info
-      const userRes = await fetch("https://api.linkedin.com/v2/userinfo", {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      });
-      const linkedinUser = await userRes.json();
-      if (!linkedinUser.email) {
-        throw redirect({ to: "/auth", search: { mode: "signin" } });
-      }
+          // Get user info
+          const userRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
+          });
+          const linkedinUser = await userRes.json();
+          if (!linkedinUser.email) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: "/auth?error=linkedin_user_info_failed" },
+            });
+          }
 
-      // Find or create user
-      const pool = getPool();
-      const profile = await findOrCreateLinkedInUser(pool, {
-        email: linkedinUser.email,
-        fullName: linkedinUser.name || linkedinUser.email.split("@")[0],
-        linkedinId: linkedinUser.sub,
-        avatarUrl: linkedinUser.picture || null,
-      });
+          // Find or create user
+          const pool = getPool();
+          const profile = await findOrCreateLinkedInUser(pool, {
+            email: linkedinUser.email,
+            fullName: linkedinUser.name || linkedinUser.email.split("@")[0],
+            linkedinId: linkedinUser.sub,
+            avatarUrl: linkedinUser.picture || null,
+          });
 
-      // Create session
-      const sessionToken = await createSessionToken({
-        userId: profile.id,
-        email: profile.email || linkedinUser.email,
-        tenantId: profile.tenant_id,
-        sessionVersion: 0,
-      });
+          // Create session with REAL sessionVersion
+          const sessionToken = await createSessionToken({
+            userId: profile.id,
+            email: profile.email || linkedinUser.email,
+            tenantId: profile.tenant_id,
+            sessionVersion: Number(profile.session_version ?? 0),
+          });
 
-      // Redirect with session cookie set via headers
-      const destination = state && state.startsWith("/") ? state : "/";
-      const cookie = [
-        `${SESSION_COOKIE}=${sessionToken}`,
-        "Path=/",
-        "HttpOnly",
-        "SameSite=Lax",
-        `Max-Age=${SESSION_MAX_AGE}`,
-      ].join("; ");
+          // Redirect with session cookie set via headers
+          const destination = safeRedirectPath(state);
+          const cookie = [
+            `${SESSION_COOKIE}=${sessionToken}`,
+            "Path=/",
+            "HttpOnly",
+            "SameSite=Lax",
+            `Max-Age=${SESSION_MAX_AGE}`,
+          ].join("; ");
 
-      throw redirect({
-        to: destination,
-        headers: { "Set-Cookie": cookie },
-      } as any);
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: destination,
+              "Set-Cookie": cookie,
+            },
+          });
+        } catch (err) {
+          console.error("LinkedIn OAuth callback error:", err);
+          return new Response(null, {
+            status: 302,
+            headers: { Location: "/auth?error=linkedin_oauth_failed" },
+          });
+        }
+      },
     },
   },
 });

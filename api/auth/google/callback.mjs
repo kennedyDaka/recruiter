@@ -7,14 +7,6 @@
  *   GOOGLE_REDIRECT_URI  (must match what was sent to Google)
  *   JWT_SECRET           (same as the app's session secret)
  *   DATABASE_URL         (PostgreSQL connection string)
- *
- * Flow:
- *   1. Google redirects here with ?code=...&state=...
- *   2. Exchange code for access_token + id_token
- *   3. Decode id_token to get email, name, sub (Google ID)
- *   4. Find or create profile + auth_credentials (passwordless)
- *   5. Create session cookie (JWT)
- *   6. Redirect to original destination
  */
 
 import { Pool } from "pg";
@@ -66,11 +58,11 @@ async function createSessionToken({ userId, email, tenantId, sessionVersion = 0 
   return token;
 }
 
-/** Find or create profile for a Google-authenticated user. */
+/** Find or create profile for a Google-authenticated user. Returns { id, tenant_id, session_version } */
 async function findOrCreateGoogleUser(pool, { email, fullName, googleId, avatarUrl }) {
   // 1. Check if profile exists by email
   const existing = await pool.query(
-    "SELECT id, tenant_id, full_name, email, email_verified FROM profiles WHERE lower(email) = lower($1)",
+    "SELECT id, tenant_id, full_name, email, email_verified, session_version FROM profiles WHERE lower(email) = lower($1)",
     [email],
   );
 
@@ -99,9 +91,9 @@ async function findOrCreateGoogleUser(pool, { email, fullName, googleId, avatarU
   // 2. New user — create profile
   const userId = crypto.randomUUID();
   const insertResult = await pool.query(
-    `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, updated_at)
-     VALUES ($1, $2, $3, true, $4, NOW())
-     RETURNING id, tenant_id, full_name, email, email_verified`,
+    `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, session_version, updated_at)
+     VALUES ($1, $2, $3, true, $4, 0, NOW())
+     RETURNING id, tenant_id, full_name, email, email_verified, session_version`,
     [userId, fullName, email, avatarUrl || null],
   );
 
@@ -129,6 +121,22 @@ function setSessionCookie(res, token) {
     .filter(Boolean)
     .join("; ");
   res.setHeader("Set-Cookie", cookie);
+}
+
+/**
+ * Validate that the redirect destination is safe (same-origin relative path).
+ * Prevents open-redirect attacks via the OAuth state parameter.
+ */
+function safeRedirectPath(dest) {
+  if (!dest || typeof dest !== "string") return "/dashboard";
+  const trimmed = dest.trim();
+  // Must start with "/" and NOT "//"
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "/dashboard";
+  // Block header injection
+  if (trimmed.includes("\r") || trimmed.includes("\n")) return "/dashboard";
+  // Max length
+  if (trimmed.length > 2048) return "/dashboard";
+  return trimmed;
 }
 
 export default async function handler(req, res) {
@@ -191,7 +199,7 @@ export default async function handler(req, res) {
       return res.redirect(302, "/auth?error=google_user_info_failed");
     }
 
-    // 3. Find or create user in our database
+    // 3. Find or create user in our database (returns session_version)
     const pool = getPool();
     const profile = await findOrCreateGoogleUser(pool, {
       email: googleUser.email,
@@ -200,17 +208,18 @@ export default async function handler(req, res) {
       avatarUrl: googleUser.picture || null,
     });
 
-    // 4. Create session cookie
+    // 4. Create session cookie — use the REAL session_version from the profile
+    // so that password changes properly invalidate OAuth sessions
     const sessionToken = await createSessionToken({
       userId: profile.id,
       email: profile.email || googleUser.email,
       tenantId: profile.tenant_id,
-      sessionVersion: 0,
+      sessionVersion: Number(profile.session_version ?? 0),
     });
     setSessionCookie(res, sessionToken);
 
-    // 5. Redirect to the original destination (or dashboard)
-    const destination = state && state.startsWith("/") ? state : "/";
+    // 5. Redirect to the safe destination (validated to prevent open redirect)
+    const destination = safeRedirectPath(state);
     res.redirect(302, destination);
   } catch (err) {
     console.error("Google OAuth callback error:", err);

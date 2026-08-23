@@ -324,8 +324,7 @@ function PaymentSuccess() {
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </a>
                 </Button>
-                <Button asChild className="flex-1" size="lg">
-                  <a href={applyUrl} target="_blank" rel="noopener">
+                <Button asChild className="flex-1" size="lg">                   <a href={applyUrl ?? undefined} target="_blank" rel="noopener">
                     Open Application
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </a>

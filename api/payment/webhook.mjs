@@ -121,15 +121,23 @@ async function verifyWithPayChangu(txRef) {
   }
 }
 
+/**
+ * Validate that the redirect destination is safe (same-origin relative path).
+ */
+function safeRedirectPath(dest) {
+  if (!dest || typeof dest !== "string") return "/dashboard";
+  const trimmed = dest.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "/dashboard";
+  if (trimmed.includes("\r") || trimmed.includes("\n")) return "/dashboard";
+  if (trimmed.length > 2048) return "/dashboard";
+  return trimmed;
+}
+
 export default async function handler(req, res) {
   // ---------------------------------------------------------------
   // GET: PayChangu redirects the browser to callback_url after
   // a successful payment. We verify with PayChangu server-side,
   // process the payment, and redirect to our success page.
-  //
-  // Per PayChangu docs:
-  //   callback_url → redirect after SUCCESS (with tx_ref appended)
-  //   return_url   → redirect after CANCEL/FAILED (with tx_ref & status=failed)
   // ---------------------------------------------------------------
   if (req.method === "GET") {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -138,10 +146,11 @@ export default async function handler(req, res) {
 
     // PayChangu appends status=failed when redirecting to return_url on cancel
     if (status === "failed" || status === "cancelled") {
-      return res.redirect(
-        302,
-        `/payment/failed?tx_ref=${encodeURIComponent(txRef)}&reason=${encodeURIComponent(status)}`
-      );
+      const campaignId = url.searchParams.get("campaign_id") || "";
+      const reason = status;
+      const params = new URLSearchParams({ tx_ref: txRef, reason });
+      if (campaignId) params.set("campaign_id", campaignId);
+      return res.redirect(302, `/payment/failed?${params.toString()}`);
     }
 
     if (!txRef) {
@@ -172,28 +181,24 @@ export default async function handler(req, res) {
 
         if (payStatus === "success") {
           // Process the payment
-          campaignId = await processSuccessfulPayment(pool, txRef, chargeId) || campaignId;
-          return res.redirect(
-            302,
-            `/payment/success?tx_ref=${encodeURIComponent(txRef)}&campaign_id=${encodeURIComponent(campaignId)}`
-          );
+          campaignId = (await processSuccessfulPayment(pool, txRef, chargeId)) || campaignId;
+          const params = new URLSearchParams({ tx_ref: txRef });
+          if (campaignId) params.set("campaign_id", campaignId);
+          return res.redirect(302, `/payment/success?${params.toString()}`);
         } else {
           // Payment not successful according to PayChangu
-          return res.redirect(
-            302,
-            `/payment/failed?tx_ref=${encodeURIComponent(txRef)}&campaign_id=${encodeURIComponent(campaignId)}&reason=not_confirmed`
-          );
+          const params = new URLSearchParams({ tx_ref: txRef, reason: "not_confirmed" });
+          if (campaignId) params.set("campaign_id", campaignId);
+          return res.redirect(302, `/payment/failed?${params.toString()}`);
         }
       }
 
       // Already paid — just redirect to success
-      return res.redirect(
-        302,
-        `/payment/success?tx_ref=${encodeURIComponent(txRef)}&campaign_id=${encodeURIComponent(campaignId)}`
-      );
+      const params = new URLSearchParams({ tx_ref: txRef });
+      if (campaignId) params.set("campaign_id", campaignId);
+      return res.redirect(302, `/payment/success?${params.toString()}`);
     } catch (error) {
       console.error("GET redirect error:", error?.message);
-      // On error, still redirect to success page — it will poll and show loading
       return res.redirect(302, `/payment/success?tx_ref=${encodeURIComponent(txRef)}`);
     }
   }
@@ -219,16 +224,14 @@ export default async function handler(req, res) {
 
     const signature = req.headers["x-paychangu-signature"] || "";
 
-    // Verify HMAC signature
+    // Verify HMAC signature — always enforced, even in test mode.
+    // In test mode, if no webhook secret is configured, we STILL require
+    // server-side verification via the PayChangu API before trusting the payload.
     const webhookSecret = process.env.PAYCHANGU_WEBHOOK_SECRET;
     const testMode = process.env.PAYCHANGU_TEST_MODE === "true";
 
-    if (!webhookSecret && !testMode) {
-      console.error("PAYCHANGU_WEBHOOK_SECRET is not configured");
-      return res.status(503).json({ error: "Webhook not configured" });
-    }
-
     if (webhookSecret) {
+      // Production path: verify HMAC signature
       const { createHmac, timingSafeEqual } = await import("node:crypto");
       const expectedHex = createHmac("sha256", webhookSecret)
         .update(rawBody)
@@ -236,18 +239,34 @@ export default async function handler(req, res) {
       const provided = Buffer.from(signature, "utf8");
       const expected = Buffer.from(expectedHex, "utf8");
       const valid =
-        provided.length === expected.length &&
-        timingSafeEqual(provided, expected);
+        provided.length === expected.length && timingSafeEqual(provided, expected);
       if (!valid) {
         console.error("Webhook signature verification failed");
         return res.status(401).json({ error: "Invalid signature" });
       }
+    } else if (!testMode) {
+      // No webhook secret AND not test mode: reject
+      console.error("PAYCHANGU_WEBHOOK_SECRET is not configured");
+      return res.status(503).json({ error: "Webhook not configured" });
     }
+    // When testMode && !webhookSecret: skip HMAC but still verify with
+    // PayChangu API below before trusting the event data.
 
     const event = payload.event;
     const data = payload.data;
 
     if (event === "charge.success" && data?.tx_ref) {
+      // In test mode without HMAC, verify directly with PayChangu before
+      // processing — prevents forged webhooks from activating campaigns.
+      if (testMode && !webhookSecret) {
+        const verification = await verifyWithPayChangu(data.tx_ref);
+        const payStatus = verification?.data?.status;
+        if (payStatus !== "success") {
+          console.error("Test mode: PayChangu verification failed for", data.tx_ref);
+          return res.status(400).json({ error: "Payment not verified" });
+        }
+      }
+
       const pool = getPool();
       await processSuccessfulPayment(pool, data.tx_ref, data.id || "");
       return res.status(200).json({ received: true });

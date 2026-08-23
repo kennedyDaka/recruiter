@@ -261,7 +261,7 @@ export async function sendEmail(
       const fallbackConfig: EmailProviderConfig = {
         mode: "smtp",
         from: config.from,
-        fromName: config.fromName,
+        fromName: config.fromName ?? null,
         smtp: {
           host: smtpHost,
           port: Number(e["SMTP_PORT"] ?? 587),

@@ -83,16 +83,18 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           // 3. Find or create user
           const email = googleUser.email.toLowerCase();
           const existing = (await dbQueryFirst(
-            "SELECT id, tenant_id, email_verified FROM profiles WHERE lower(email) = $1",
+            "SELECT id, tenant_id, email_verified, session_version FROM profiles WHERE lower(email) = $1",
             [email],
-          )) as { id: string; tenant_id: string | null; email_verified: unknown } | null;
+          )) as { id: string; tenant_id: string | null; email_verified: unknown; session_version: number } | null;
 
           let profileId: string;
           let tenantId: string | null = null;
+          let sessionVersion = 0;
 
           if (existing) {
             profileId = existing.id;
             tenantId = existing.tenant_id;
+            sessionVersion = Number(existing.session_version ?? 0);
 
             // Ensure email is verified
             if (!existing.email_verified) {
@@ -114,8 +116,8 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             profileId = crypto.randomUUID();
             const fullName = googleUser.name || email.split("@")[0];
             await dbExecute(
-              `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, updated_at)
-               VALUES ($1, $2, $3, true, $4, NOW())`,
+              `INSERT INTO profiles (id, full_name, email, email_verified, avatar_url, session_version, updated_at)
+               VALUES ($1, $2, $3, true, $4, 0, NOW())`,
               [profileId, fullName, email, googleUser.picture || null],
             );
 
@@ -126,16 +128,21 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             );
           }
 
-          // 4. Create session
+          // 4. Create session with REAL sessionVersion
           const token = await createSession({
             userId: profileId,
             email,
-            sessionVersion: 0,
+            sessionVersion,
             ...(tenantId ? { tenantId } : {}),
           });
 
-          // 5. Set cookie and redirect
-          const destination = state && state.startsWith("/") ? state : "/";
+          // 5. Validate redirect destination to prevent open-redirect attacks
+          const dest = state?.trim();
+          let destination = "/dashboard";
+          if (dest && dest.startsWith("/") && !dest.startsWith("//") && dest.length <= 2048) {
+            destination = dest;
+          }
+
           const cookie = `hf_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
 
           return new Response(null, {

@@ -57,8 +57,16 @@ export function resolveEmailConfig(
   }
 
   const envMode = (e["EMAIL_PROVIDER"] ?? "").toLowerCase();
-  const mode: EmailProviderMode =
-    envMode === "smtp" ? "smtp" : envMode === "resend" ? "resend" : "log";
+  // Auto-detect: if an API key or SMTP host is present, infer the provider
+  // even when EMAIL_PROVIDER is missing or empty (common on first deploy).
+  let mode: EmailProviderMode;
+  if (envMode === "smtp" || (envMode === "" && e["SMTP_HOST"])) {
+    mode = "smtp";
+  } else if (envMode === "resend" || (envMode === "" && e["EMAIL_API_KEY"])) {
+    mode = "resend";
+  } else {
+    mode = "log";
+  }
 
   const smtp: NonNullable<EmailProviderConfig["smtp"]> = {
     host: e["SMTP_HOST"] ?? "",
@@ -70,7 +78,7 @@ export function resolveEmailConfig(
 
   const config: Partial<EmailProviderConfig> = {
     mode,
-    from: e["EMAIL_FROM"] || "noreply@operonrecruit.com",
+    from: e["EMAIL_FROM"] || "onboarding@resend.dev",
     smtp,
   };
   if (e["EMAIL_API_KEY"]) config.resendApiKey = e["EMAIL_API_KEY"];
@@ -121,6 +129,12 @@ export function emailProviderStatus(config: EmailProviderConfig): {
   if (config.mode === "resend" && config.resendApiKey)
     return {
       label: "Resend API — verify your sending domain at resend.com/domains",
+      configured: true,
+    };
+  // Auto-detected Resend from API key (EMAIL_PROVIDER not explicitly set)
+  if (config.resendApiKey)
+    return {
+      label: "Resend API (auto-detected) — emails are being sent",
       configured: true,
     };
   return {

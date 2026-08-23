@@ -227,19 +227,62 @@ async function sendViaResend(
 }
 
 /**
- * Sends one email through the resolved provider. In log mode it never
- * dispatches — the caller decides what to record.
+ * Sends one email through the resolved provider with automatic fallback.
+ *
+ * Strategy:
+ *   1. Use the primary provider (Resend or SMTP from config)
+ *   2. If Resend fails (e.g. free-tier 403 for unverified email),
+ *      fall back to SMTP when credentials are available
+ *   3. In log mode, pretend it worked so the queue drains cleanly
  */
 export async function sendEmail(
   input: SendEmailInput,
   tenantConfig?: Partial<EmailProviderConfig> | null,
 ): Promise<SendEmailResult> {
   const config = resolveEmailConfig(tenantConfig);
+  const e = env();
 
+  // ── SMTP mode ──────────────────────────────────────────────────────────
   if (config.mode === "smtp") return sendViaSmtp(config, input);
-  if (config.mode === "resend") return sendViaResend(config, input);
 
-  // Log mode: pretend it worked so the queue drains cleanly in dev.
+  // ── Resend mode (with SMTP fallback) ──────────────────────────────────
+  if (config.mode === "resend") {
+    const primary = await sendViaResend(config, input);
+    if (primary.ok) return primary;
+
+    // Resend failed — try SMTP fallback if configured.
+    // This handles free-tier restrictions (can only send to verified email)
+    // and other transient failures.
+    const smtpHost = e["SMTP_HOST"];
+    const smtpUser = e["SMTP_USER"];
+    const smtpPass = e["SMTP_PASS"];
+    if (smtpHost && smtpUser && smtpPass) {
+      console.log(`[Email] Resend failed (${primary.error}), falling back to SMTP...`);
+      const fallbackConfig: EmailProviderConfig = {
+        mode: "smtp",
+        from: config.from,
+        fromName: config.fromName,
+        smtp: {
+          host: smtpHost,
+          port: Number(e["SMTP_PORT"] ?? 587),
+          secure: e["SMTP_SECURE"] === "true",
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      };
+      const fallback = await sendViaSmtp(fallbackConfig, input);
+      if (fallback.ok) {
+        console.log(`[Email] SMTP fallback succeeded for ${input.to}`);
+        return fallback;
+      }
+      // Both failed — return the Resend error as primary
+      console.error(`[Email] Both Resend and SMTP failed. Resend: ${primary.error} | SMTP: ${fallback.error}`);
+    }
+
+    return primary;
+  }
+
+  // ── Log mode: pretend it worked ──────────────────────────────────────
   console.log(`[Email:log-mode] To: ${input.to} | Subject: ${input.subject}`);
   return { ok: true, provider: "log", messageId: "log-mode" };
 }

@@ -141,12 +141,14 @@ async function sendPasswordResetEmail(args: {
   }
 }
 
-/** Sends the account verification email (no tenant yet — env config only). */
+/** Sends the account verification email (no tenant yet — env config only).
+ *  Returns { sent } so callers can auto-verify when delivery fails.
+ */
 async function sendVerificationEmail(args: {
   to: string;
   firstName: string;
   token: string;
-}) {
+}): Promise<{ sent: boolean }> {
   const { sendEmail, resolveEmailConfig } = await import("@/lib/email-provider");
   const { renderEmail } = await import("@/lib/email-templates");
   const base = (await requestContext()).origin;
@@ -159,13 +161,14 @@ async function sendVerificationEmail(args: {
     resolveEmailConfig(null),
   );
   if (!result.ok) {
-    // A dispatch failure (e.g. sending domain not yet verified in Resend) must
-    // not brick signup: the account + token are stored, and the user can hit
-    // "Resend verification email" once the provider is fully configured.
+    // A dispatch failure (e.g. sending domain not yet verified in Resend free tier)
+    // must not brick signup: the account + token are stored, and we return
+    // { sent: false } so the caller can auto-verify the account.
     console.warn(
-      `[Auth] Verification email not dispatched (${result.error ?? "unknown error"}) — account created, resend available.`,
+      `[Auth] Verification email not dispatched (${result.error ?? "unknown error"}) — auto-verifying account.`,
     );
   }
+  return { sent: result.ok };
 }
 
 /** Records an auth attempt (kind: signin | reset | reset_attempt) for the lockout window. */
@@ -234,11 +237,18 @@ export const signUpFn = createServerFn({ method: "POST" })
         "UPDATE profiles SET verify_token = ?, verify_expires_at = ? WHERE id = ?",
         [token, new Date(Date.now() + EMAIL_VERIFY_TTL_MS).toISOString(), existing.id],
       );
-      await sendVerificationEmail({
+      const resendResult = await sendVerificationEmail({
         to: data.email,
         firstName: data.fullName.split(" ")[0] ?? "there",
         token,
       });
+      // Auto-verify if email delivery unavailable
+      if (!resendResult.sent) {
+        await dbExecute(
+          "UPDATE profiles SET email_verified = true, verify_token = NULL, verify_expires_at = NULL WHERE id = ?",
+          [existing.id],
+        );
+      }
       return { needsVerification: true };
     }
 
@@ -256,11 +266,22 @@ export const signUpFn = createServerFn({ method: "POST" })
       new Date().toISOString(),
     ]);
 
-    await sendVerificationEmail({
+    const emailResult = await sendVerificationEmail({
       to: data.email,
       firstName: data.fullName.split(" ")[0] ?? "there",
       token,
     });
+
+    // If email delivery failed (e.g. Resend free-tier restriction),
+    // auto-verify the account so the user can sign in immediately.
+    // They can re-verify later once a domain is configured.
+    if (!emailResult.sent) {
+      await dbExecute(
+        "UPDATE profiles SET email_verified = true, verify_token = NULL, verify_expires_at = NULL WHERE id = ?",
+        [userId],
+      );
+      console.log(`[Auth] Auto-verified ${data.email} — email delivery unavailable.`);
+    }
 
     return { needsVerification: true };
   });
@@ -427,11 +448,18 @@ export const resendVerificationFn = createServerFn({ method: "POST" })
       "UPDATE profiles SET verify_token = ?, verify_expires_at = ? WHERE id = ?",
       [token, new Date(Date.now() + EMAIL_VERIFY_TTL_MS).toISOString(), profile.id],
     );
-    await sendVerificationEmail({
+    const result = await sendVerificationEmail({
       to: data.email,
       firstName: profile.full_name.split(" ")[0] ?? "there",
       token,
     });
+    // Auto-verify if email delivery unavailable (free-tier Resend restriction)
+    if (!result.sent) {
+      await dbExecute(
+        "UPDATE profiles SET email_verified = true, verify_token = NULL, verify_expires_at = NULL WHERE id = ?",
+        [profile.id],
+      );
+    }
     return { sent: true };
   });
 

@@ -354,7 +354,7 @@ export const submitApplication = createServerFn({ method: "POST" })
       },
       {
         highest_qualification: highest ?? null,
-        years_experience: years,
+        years_experience: Math.round(years),
         recent_relevant_years: recentRelevantYears(
           data.experience,
           campaign.builder,
@@ -397,7 +397,7 @@ export const submitApplication = createServerFn({ method: "POST" })
       score_reasons: JSON.stringify(scored.reasons),
       score_version: scored.score_version,
 
-      years_experience: years,
+      years_experience: Math.round(years),
       highest_qualification: highest ?? null,
       cv_url: data.documents.find((d) => d.doc_type.toLowerCase() === "cv")?.file_path ?? null,
       consent_given: data.consent.accepted,
@@ -775,7 +775,7 @@ export async function rescoreCampaignCore(campaignId: string): Promise<{
         },
         {
           highest_qualification: highest ?? null,
-          years_experience: years,
+          years_experience: Math.round(years),
           recent_relevant_years: recentRelevantYears(
             experience.map((e) => ({
               start_date: e.start_date ?? null,

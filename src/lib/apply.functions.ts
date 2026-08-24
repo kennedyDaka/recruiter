@@ -10,6 +10,7 @@ import {
   type OrsThresholds,
   type ScoredQuestion,
 } from "@/lib/ors";
+import { scoreApplicationV2, type CampaignScoringModel, type CandidateScoringInput } from "@/lib/ors-scoring-v2";
 import { renderEmail, resolveEmailTemplate } from "@/lib/email-templates";
 import { applyAutoPipeline } from "@/lib/auto-pipeline";
 
@@ -331,52 +332,109 @@ export const submitApplication = createServerFn({ method: "POST" })
         .filter((name): name is string => Boolean(name)),
     ];
 
-    const scored = scoreApplication(
-      {
-        weights: parseJsonObject<Partial<OrsWeights>>(campaign.weights) ?? {},
-        thresholds: parseJsonObject<Partial<OrsThresholds>>(campaign.thresholds) ?? {},
-        min_qualification: campaign.min_qualification,
-        min_experience_years: campaign.min_experience_years,
-        required_skills: parseJsonList(campaign.required_skills),
-        required_certifications: parseJsonList(campaign.required_certifications),
-        competencies: parseJsonList(campaign.competencies),
-        fields_of_study: fieldsOfStudyFromBuilder(campaign.builder),
-        experience_fields: experienceFieldsFromBuilder(campaign.builder),
-        experience_recency_years: experienceRecencyYearsFromBuilder(campaign.builder),
-        qualification_preferred: qualificationPreferredFromBuilder(campaign.builder),
-        referee_count: campaign.referee_count,
-        location_countries: locationCountriesFromBuilder(campaign.builder, campaign.country),
-        target_occupation: campaign.job_title as string,
-        target_job_family: jobFamilyFromBuilder(campaign.builder),
-        highly_relevant_positions: highlyRelevantPositionsFromBuilder(campaign.builder),
-        related_positions: relatedPositionsFromBuilder(campaign.builder),
-        industry: industryFromBuilder(campaign.builder),
-      },
-      {
-        highest_qualification: highest ?? null,
-        years_experience: Math.round(years),
-        recent_relevant_years: recentRelevantYears(
-          data.experience,
-          campaign.builder,
-        ),
-        skills: data.skills.map((s) => s.skill),
-        certifications: certificationsHeld,
-        fields_of_study: data.education.map((education) => education.field_of_study),
-        work_fields: data.experience.map((entry) => entry.field).filter(Boolean),
-        country: data.personal.country || null,
-        referee_count: data.referees.length,
-        answers,
-        questions,
-        position_history: data.experience.map((entry) => ({
-          title: entry.position,
-          start_date: entry.start_date ?? null,
-          end_date: entry.end_date ?? null,
-          is_current: entry.is_current,
-          field: entry.field || null,
-        })),
-        industry: industryFromBuilder(campaign.builder),
-      },
-    );
+    // Use v2 requirement-based scoring when scoring_model is present on the campaign.
+    // Falls back to v1 flat scoring for legacy campaigns.
+    let scored;
+    const scoringModelRaw = (campaign as any).scoring_model;
+    if (scoringModelRaw) {
+      try {
+        const scoringModel: CampaignScoringModel = typeof scoringModelRaw === 'string'
+          ? JSON.parse(scoringModelRaw)
+          : scoringModelRaw;
+        const candidateInput: CandidateScoringInput = {
+          highestQualification: highest || undefined,
+          fieldsOfStudy: data.education.map((e) => e.field_of_study).filter(Boolean),
+          yearsExperience: Math.round(years),
+          experienceEntries: data.experience.map((entry) => ({
+            title: entry.position,
+            field: entry.field || undefined,
+            years: entry.start_date
+              ? Math.round(yearsFromExperience([entry as any]) * 10) / 10
+              : undefined,
+            startDate: entry.start_date ?? undefined,
+            endDate: entry.end_date ?? undefined,
+            isCurrent: entry.is_current,
+          })),
+          skills: data.skills.map((s) => s.skill),
+          certifications: certificationsHeld,
+          country: data.personal.country || undefined,
+          industry: industryFromBuilder(campaign.builder),
+          answers,
+        };
+        const v2Result = scoreApplicationV2(scoringModel, candidateInput);
+        // Map v2 result to v1-compatible OrsResult shape for downstream consumers
+        scored = {
+          total: v2Result.total,
+          breakdown: v2Result.breakdown.map((d) => ({
+            dimension: d.dimension as any,
+            label: d.label,
+            score: d.score,
+            max: d.max,
+          })),
+          recommendation: v2Result.recommendation as any,
+          eligibility: v2Result.eligibility.gates.map((g) => ({
+            name: g.name,
+            passed: g.passed,
+            reason: g.reason,
+          })),
+          eligible: v2Result.eligibility.eligible,
+          reasons: v2Result.reasons,
+          score_version: 2,
+        };
+      } catch (err) {
+        console.error("[Apply] v2 scoring failed, falling back to v1:", err);
+        // Fall through to v1 below
+      }
+    }
+
+    if (!scored) {
+      scored = scoreApplication(
+        {
+          weights: parseJsonObject<Partial<OrsWeights>>(campaign.weights) ?? {},
+          thresholds: parseJsonObject<Partial<OrsThresholds>>(campaign.thresholds) ?? {},
+          min_qualification: campaign.min_qualification,
+          min_experience_years: campaign.min_experience_years,
+          required_skills: parseJsonList(campaign.required_skills),
+          required_certifications: parseJsonList(campaign.required_certifications),
+          competencies: parseJsonList(campaign.competencies),
+          fields_of_study: fieldsOfStudyFromBuilder(campaign.builder),
+          experience_fields: experienceFieldsFromBuilder(campaign.builder),
+          experience_recency_years: experienceRecencyYearsFromBuilder(campaign.builder),
+          qualification_preferred: qualificationPreferredFromBuilder(campaign.builder),
+          referee_count: campaign.referee_count,
+          location_countries: locationCountriesFromBuilder(campaign.builder, campaign.country),
+          target_occupation: campaign.job_title as string,
+          target_job_family: jobFamilyFromBuilder(campaign.builder),
+          highly_relevant_positions: highlyRelevantPositionsFromBuilder(campaign.builder),
+          related_positions: relatedPositionsFromBuilder(campaign.builder),
+          industry: industryFromBuilder(campaign.builder),
+        },
+        {
+          highest_qualification: highest ?? null,
+          years_experience: Math.round(years),
+          recent_relevant_years: recentRelevantYears(
+            data.experience,
+            campaign.builder,
+          ),
+          skills: data.skills.map((s) => s.skill),
+          certifications: certificationsHeld,
+          fields_of_study: data.education.map((education) => education.field_of_study),
+          work_fields: data.experience.map((entry) => entry.field).filter(Boolean),
+          country: data.personal.country || null,
+          referee_count: data.referees.length,
+          answers,
+          questions,
+          position_history: data.experience.map((entry) => ({
+            title: entry.position,
+            start_date: entry.start_date ?? null,
+            end_date: entry.end_date ?? null,
+            is_current: entry.is_current,
+            field: entry.field || null,
+          })),
+          industry: industryFromBuilder(campaign.builder),
+        },
+      );
+    }
 
     const stageRes = await supabaseAdmin
       .from("recruitment_stages")
@@ -752,57 +810,109 @@ export async function rescoreCampaignCore(campaignId: string): Promise<{
           .filter((name): name is string => Boolean(name)),
       ];
 
-      const scored = scoreApplication(
-        {
-          weights: parseJsonObject<Partial<OrsWeights>>(campaign.weights) ?? {},
-          thresholds: parseJsonObject<Partial<OrsThresholds>>(campaign.thresholds) ?? {},
-          min_qualification: campaign.min_qualification,
-          min_experience_years: campaign.min_experience_years,
-          required_skills: parseJsonList(campaign.required_skills),
-          required_certifications: parseJsonList(campaign.required_certifications),
-          competencies: parseJsonList(campaign.competencies),
-          fields_of_study: fieldsOfStudyFromBuilder(campaign.builder),
-          experience_fields: experienceFieldsFromBuilder(campaign.builder),
-          experience_recency_years: experienceRecencyYearsFromBuilder(campaign.builder),
-          qualification_preferred: qualificationPreferredFromBuilder(campaign.builder),
-          referee_count: campaign.referee_count,
-          location_countries: locationCountriesFromBuilder(campaign.builder, campaign.country),
-          target_occupation: campaign.job_title as string,
-          target_job_family: jobFamilyFromBuilder(campaign.builder),
-          highly_relevant_positions: highlyRelevantPositionsFromBuilder(campaign.builder),
-          related_positions: relatedPositionsFromBuilder(campaign.builder),
-          industry: industryFromBuilder(campaign.builder),
-        },
-        {
-          highest_qualification: highest ?? null,
-          years_experience: Math.round(years),
-          recent_relevant_years: recentRelevantYears(
-            experience.map((e) => ({
+      // v2 scoring path when scoring_model is present
+      let scored;
+      const scoringModelRaw2 = (campaign as any).scoring_model;
+      if (scoringModelRaw2) {
+        try {
+          const scoringModel2: CampaignScoringModel = typeof scoringModelRaw2 === 'string'
+            ? JSON.parse(scoringModelRaw2)
+            : scoringModelRaw2;
+          const candidateInput2: CandidateScoringInput = {
+            highestQualification: highest || undefined,
+            fieldsOfStudy: education.map((e) => e.field_of_study ?? "").filter(Boolean),
+            yearsExperience: Math.round(years),
+            experienceEntries: experience.map((e) => ({
+              title: e.position,
+              field: e.field ?? undefined,
+              years: e.start_date ? Math.round(yearsFromExperience([e as any]) * 10) / 10 : undefined,
+              startDate: e.start_date ?? undefined,
+              endDate: e.end_date ?? undefined,
+              isCurrent: Boolean(e.is_current),
+            })),
+            skills: skills.map((s) => s.skill),
+            certifications: certificationsHeld,
+            country: candidate?.country ?? undefined,
+            industry: industryFromBuilder(campaign.builder),
+            answers,
+          };
+          const v2Result2 = scoreApplicationV2(scoringModel2, candidateInput2);
+          scored = {
+            total: v2Result2.total,
+            breakdown: v2Result2.breakdown.map((d) => ({
+              dimension: d.dimension as any,
+              label: d.label,
+              score: d.score,
+              max: d.max,
+            })),
+            recommendation: v2Result2.recommendation as any,
+            eligibility: v2Result2.eligibility.gates.map((g) => ({
+              name: g.name,
+              passed: g.passed,
+              reason: g.reason,
+            })),
+            eligible: v2Result2.eligibility.eligible,
+            reasons: v2Result2.reasons,
+            score_version: 2,
+          };
+        } catch (err) {
+          console.error("[Apply] v2 scoring failed, falling back to v1:", err);
+        }
+      }
+
+      if (!scored) {
+        scored = scoreApplication(
+          {
+            weights: parseJsonObject<Partial<OrsWeights>>(campaign.weights) ?? {},
+            thresholds: parseJsonObject<Partial<OrsThresholds>>(campaign.thresholds) ?? {},
+            min_qualification: campaign.min_qualification,
+            min_experience_years: campaign.min_experience_years,
+            required_skills: parseJsonList(campaign.required_skills),
+            required_certifications: parseJsonList(campaign.required_certifications),
+            competencies: parseJsonList(campaign.competencies),
+            fields_of_study: fieldsOfStudyFromBuilder(campaign.builder),
+            experience_fields: experienceFieldsFromBuilder(campaign.builder),
+            experience_recency_years: experienceRecencyYearsFromBuilder(campaign.builder),
+            qualification_preferred: qualificationPreferredFromBuilder(campaign.builder),
+            referee_count: campaign.referee_count,
+            location_countries: locationCountriesFromBuilder(campaign.builder, campaign.country),
+            target_occupation: campaign.job_title as string,
+            target_job_family: jobFamilyFromBuilder(campaign.builder),
+            highly_relevant_positions: highlyRelevantPositionsFromBuilder(campaign.builder),
+            related_positions: relatedPositionsFromBuilder(campaign.builder),
+            industry: industryFromBuilder(campaign.builder),
+          },
+          {
+            highest_qualification: highest ?? null,
+            years_experience: Math.round(years),
+            recent_relevant_years: recentRelevantYears(
+              experience.map((e) => ({
+                start_date: e.start_date ?? null,
+                end_date: e.end_date ?? null,
+                is_current: Boolean(e.is_current),
+                field: e.field ?? null,
+              })),
+              campaign.builder,
+            ),
+            skills: skills.map((s) => s.skill),
+            certifications: certificationsHeld,
+            fields_of_study: education.map((e) => e.field_of_study ?? "").filter(Boolean),
+            work_fields: experience.map((e) => e.field ?? "").filter(Boolean),
+            country: candidate?.country ?? null,
+            referee_count: referees.length,
+            answers,
+            questions,
+            position_history: experience.map((e) => ({
+              title: e.position,
               start_date: e.start_date ?? null,
               end_date: e.end_date ?? null,
               is_current: Boolean(e.is_current),
               field: e.field ?? null,
             })),
-            campaign.builder,
-          ),
-          skills: skills.map((s) => s.skill),
-          certifications: certificationsHeld,
-          fields_of_study: education.map((e) => e.field_of_study ?? "").filter(Boolean),
-          work_fields: experience.map((e) => e.field ?? "").filter(Boolean),
-          country: candidate?.country ?? null,
-          referee_count: referees.length,
-          answers,
-          questions,
-          position_history: experience.map((e) => ({
-            title: e.position,
-            start_date: e.start_date ?? null,
-            end_date: e.end_date ?? null,
-            is_current: Boolean(e.is_current),
-            field: e.field ?? null,
-          })),
-          industry: industryFromBuilder(campaign.builder),
-        },
-      );
+            industry: industryFromBuilder(campaign.builder),
+          },
+        );
+      }
 
       const update = await supabaseAdmin
         .from("applications")

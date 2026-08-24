@@ -137,6 +137,7 @@ model Campaign {
   weights              String?
   thresholds           String?
   builder              String?
+  scoring_model        String?  // JSON: CampaignScoringModel with requirement groups
   competencies         String   @default("[]")
   referee_count        Int      @default(2)
   status               String   @default("draft")

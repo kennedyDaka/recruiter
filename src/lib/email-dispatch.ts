@@ -54,6 +54,7 @@ export async function dispatchCommunication(
         .from("communications")
         .update({ status: "failed", error: "Missing phone number or message body" })
         .eq("id", id);
+      await autoIncident(tenantId, "WhatsApp delivery failed", "WHATSAPP_MISSING_RECIPIENT", "Missing phone number or message body", "Send candidate message", "whatsapp");
       return { sent: false, error: "Missing phone number or message body" };
     }
     const { sendWhatsAppMessage } = await import("@/lib/whatsapp-provider");
@@ -69,6 +70,7 @@ export async function dispatchCommunication(
       .from("communications")
       .update({ status: "failed", error: result.error ?? "WhatsApp send failed" })
       .eq("id", id);
+    await autoIncident(tenantId, "WhatsApp message failed", "WHATSAPP_SEND_FAILED", result.error || "WhatsApp send failed", "Send candidate message", "whatsapp");
     return result.error ? { sent: false, error: result.error } : { sent: false };
   }
 
@@ -115,6 +117,7 @@ export async function dispatchCommunication(
     .from("communications")
     .update({ status: "failed", error: result.error ?? "Send failed" })
     .eq("id", id);
+  await autoIncident(tenantId, "Email delivery failed", "EMAIL_SEND_FAILED", result.error || "Send failed", "Send candidate email", "email");
   return finish(false, result.error);
 }
 
@@ -141,4 +144,60 @@ export async function flushQueuedCommunications(supabase: any, tenantId?: string
     else failed += 1;
   }
   return { sent, failed };
+}
+
+/**
+ * Auto-create an incident when a communication fails. Wraps the incident
+ * creation in a try/catch so a failure here never blocks the dispatch flow.
+ */
+async function autoIncident(
+  tenantId: string,
+  title: string,
+  errorType: string,
+  errorMessage: string,
+  action: string,
+  channel: string,
+) {
+  try {
+    const { autoCreateIncident } = await import("@/lib/incident.functions");
+    // We can't call createServerFn from here directly, so we use the
+    // underlying autoCreateIncident helper which works outside server fn context.
+    const supabase = await import("@/lib/supabase.server").then((m) => m.getSupabaseClient());
+    const now = new Date().toISOString();
+
+    const { data: lastIncident } = await supabase
+      .from("incidents" as any)
+      .select("incident_number")
+      .order("incident_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextNumber = ((lastIncident as any)?.incident_number || 0) + 1;
+    const priority = "normal";
+    const slaResponse = new Date(Date.now() + 2 * 3600000).toISOString();
+    const slaResolution = new Date(Date.now() + 24 * 3600000).toISOString();
+
+    await supabase.from("incidents" as any).insert({
+      tenant_id: tenantId,
+      incident_number: nextNumber,
+      source: "auto_detected",
+      priority,
+      status: "detected",
+      issue_type: "technical",
+      category: "communication",
+      title,
+      error_type: errorType,
+      error_message: errorMessage?.slice(0, 1000) || null,
+      action,
+      channel,
+      reported_by: "00000000-0000-0000-0000-000000000000",
+      reporter_name: "System",
+      sla_response_deadline: slaResponse,
+      sla_resolution_deadline: slaResolution,
+      created_at: now,
+      updated_at: now,
+    } as any);
+  } catch (err) {
+    console.error("[autoIncident] Failed to create incident:", err);
+  }
 }

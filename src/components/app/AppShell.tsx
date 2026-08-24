@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Briefcase,
+  Headphones,
   KanbanSquare,
   LayoutDashboard,
   LifeBuoy,
@@ -22,6 +23,7 @@ const nav = [
   { to: "/candidates", label: "Candidates", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/support", label: "Help & Support", icon: LifeBuoy },
+  { to: "/contact-center", label: "Contact Center", icon: Headphones },
 ] as const;
 
 export function AppShell({

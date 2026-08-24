@@ -46,6 +46,7 @@ export const saveCampaignDraft = createServerFn({ method: "POST" })
       closing_date: data.closingDate || null,
       weights: data.weights as unknown as Json,
       builder: data.builder as unknown as Json,
+      scoring_model: data.scoringModel ? JSON.stringify(data.scoringModel) : null,
       status: "draft" as const,
     };
 

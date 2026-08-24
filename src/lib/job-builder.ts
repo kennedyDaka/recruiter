@@ -141,6 +141,10 @@ export type JobBuilder = {
   relatedPositions: string[];
   /** Industry for industry experience scoring. */
   industry: string;
+
+  // v2 Requirement Groups
+  /** Requirement groups for the new eligibility + scoring engine. */
+  requirementGroups: import("@/lib/ors-requirements").RequirementGroup[];
 };
 
 export type ApplicationSection =
@@ -1427,5 +1431,7 @@ export function defaultBuilder(): JobBuilder {
   highlyRelevantPositions: [],
   relatedPositions: [],
   industry: "",
+  // v2 Requirement Groups
+  requirementGroups: [],
 };
 }

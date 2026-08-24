@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { RequirementGroupsEditor } from "@/components/recruitment/RequirementGroupsEditor";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
@@ -498,6 +499,17 @@ export function CampaignWizard() {
             mandatory: q.mandatory,
             condition: q.condition ?? null,
           })),
+          scoringModel: builder.requirementGroups.length > 0
+            ? {
+                requirementGroups: builder.requirementGroups,
+                weights: builder.weights as unknown as Record<string, number>,
+                experienceRecencyYears: builder.experienceRecencyYears,
+                targetOccupation: builder.jobTitle,
+                highlyRelevantPositions: builder.highlyRelevantPositions,
+                relatedPositions: builder.relatedPositions,
+                industry: builder.industry,
+              }
+            : null,
         },
       } as never);
       return (result as { campaignId: string }).campaignId;
@@ -1883,6 +1895,14 @@ export function CampaignWizard() {
                 ))}
               </div>
             </div>
+
+            <Separator />
+
+            {/* v2 Requirement Groups */}
+            <RequirementGroupsEditor
+              groups={builder.requirementGroups}
+              onChange={(groups) => patch({ requirementGroups: groups })}
+            />
           </div>
         ) : null}
 

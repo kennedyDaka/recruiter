@@ -44,6 +44,7 @@ export const saveCampaignSchema = z.object({
   closingDate: z.string().trim().max(20).default(""),
   weights: z.record(z.string(), z.number()),
   questions: z.array(builderQuestionSchema).max(80).default([]),
+  scoringModel: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export type SaveCampaignInput = z.infer<typeof saveCampaignSchema>;

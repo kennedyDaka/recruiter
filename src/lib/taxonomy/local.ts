@@ -1,4 +1,5 @@
 import { from } from "@/lib/db";
+import { searchExtraTitles } from "@/lib/extra-titles";
 import type { TaxonomyEntry, TaxonomyProvider } from "./types";
 
 function normalise(value: string) {
@@ -42,8 +43,28 @@ async function searchTable(
 export class LocalProvider implements TaxonomyProvider {
   readonly name = "local";
 
-  searchOccupations(query: string, limit = 8) {
-    return searchTable("job_titles", query, limit);
+  async searchOccupations(query: string, limit = 8) {
+    // Search both the DB table AND the massive extra titles catalog
+    const [dbResults, extraResults] = await Promise.all([
+      searchTable("job_titles", query, limit),
+      Promise.resolve(
+        searchExtraTitles(query, limit).map((item) => ({
+          id: `extra:${item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+          label: item.label,
+          source: "local" as const,
+        })),
+      ),
+    ]);
+    // Merge and dedupe, DB results first
+    const seen = new Set(dbResults.map((r) => r.label.toLowerCase()));
+    const merged = [...dbResults];
+    for (const entry of extraResults) {
+      if (!seen.has(entry.label.toLowerCase())) {
+        seen.add(entry.label.toLowerCase());
+        merged.push(entry);
+      }
+    }
+    return merged.slice(0, limit);
   }
 
   searchSkills(query: string, limit = 8) {

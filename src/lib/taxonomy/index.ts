@@ -81,37 +81,36 @@ class HybridProvider implements TaxonomyProvider {
   }
 }
 
-/** ESCO plus O*NET — merged and deduped, active when ONET_API_KEY is set. */
+/** ESCO plus O*NET plus local fallback — merged and deduped, active when ONET_API_KEY is set. */
 class EscoOnetProvider implements TaxonomyProvider {
   readonly name = "esco+onet";
   private readonly esco = new EscoProvider();
   private readonly onet = new OnetProvider();
+  private readonly local = new LocalProvider();
 
   private async merged(
+    query: string,
     limit: number,
     escoSearch: (limit: number) => Promise<TaxonomyEntry[]>,
     onetSearch: (limit: number) => Promise<TaxonomyEntry[]>,
   ): Promise<TaxonomyEntry[]> {
-    const [esco, onet] = await Promise.allSettled([escoSearch(limit), onetSearch(limit)]);
-    // If one source fails but the other answers, keep its results. If the
-    // primary source (ESCO) fails and the secondary came back empty — which is
-    // the norm for kinds O*NET does not cover (skills, families) — throw so
-    // the UI can say "could not reach the catalog" instead of pretending the
-    // search genuinely found no matches.
-    if (esco.status === "rejected" && (onet.status === "rejected" || onet.value.length === 0)) {
-      throw new AggregateError(
-        [esco.reason, onet.status === "rejected" ? onet.reason : new Error("no secondary results")],
-        "Both taxonomy providers failed",
-      );
-    }
+    // Always include local fallback — it has 500+ extra titles that ESCO/O*NET miss
+    const [esco, onet, local] = await Promise.allSettled([
+      escoSearch(limit),
+      onetSearch(limit),
+      this.local.searchOccupations(query, limit * 2),
+    ]);
+    // Never throw — local always provides results
     return dedupe([
       ...(esco.status === "fulfilled" ? esco.value : []),
       ...(onet.status === "fulfilled" ? onet.value : []),
+      ...(local.status === "fulfilled" ? local.value : []),
     ]).slice(0, limit);
   }
 
   searchOccupations(query: string, limit = 8) {
     return this.merged(
+      query,
       limit,
       (l) => this.esco.searchOccupations(query, l),
       (l) => this.onet.searchOccupations(query, l),
@@ -120,6 +119,7 @@ class EscoOnetProvider implements TaxonomyProvider {
 
   searchSkills(query: string, limit = 8) {
     return this.merged(
+      query,
       limit,
       (l) => this.esco.searchSkills(query, l),
       () => Promise.resolve([]),
@@ -133,6 +133,7 @@ class EscoOnetProvider implements TaxonomyProvider {
 
   searchJobFamilies(query: string, limit = 8) {
     return this.merged(
+      query,
       limit,
       (l) => this.esco.searchJobFamilies?.(query, l) ?? Promise.resolve([]),
       () => Promise.resolve([]),
@@ -168,7 +169,7 @@ export function getTaxonomyProvider(): TaxonomyProvider {
     case "esco+onet":
       return new EscoOnetProvider();
     default:
-      return isOnetConfigured() ? new EscoOnetProvider() : new EscoProvider();
+      return isOnetConfigured() ? new EscoOnetProvider() : new HybridProvider();
   }
 }
 

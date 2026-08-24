@@ -140,6 +140,7 @@ function TaxonomySearch({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [focused, setFocused] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -181,15 +182,21 @@ function TaxonomySearch({
     <div className="relative">
       <div className="flex gap-2">
         <Input
-          value={query || value}
+          value={focused || query ? query : value}
           placeholder={placeholder ?? "Type to search (ESCO + local catalog)"}
           maxLength={120}
           onChange={(e) => {
             setQuery(e.target.value);
             if (e.target.value.trim().length < 2) setOpen(false);
           }}
-          onFocus={() => query.trim().length >= 2 && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onFocus={() => {
+            setFocused(true);
+            if (query.trim().length >= 2) setOpen(true);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            setTimeout(() => setOpen(false), 150);
+          }}
         />
         {source ? (
           <Badge variant="outline" className="shrink-0 self-center">

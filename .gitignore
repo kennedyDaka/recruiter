@@ -20,3 +20,4 @@ uploads-test/
 check-campaign.cjs
 
 .vercel
+.env.vercel

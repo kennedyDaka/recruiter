@@ -16,10 +16,12 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AuthenticatedCandidatesRouteImport } from './routes/_authenticated/candidates'
+import { Route as AuthenticatedContactCenterRouteImport } from './routes/_authenticated/contact-center'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedKanbanRouteImport } from './routes/_authenticated/kanban'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as ApiPlansRouteImport } from './routes/api/plans'
 import { Route as ApplyCampaignIdRouteImport } from './routes/apply.$campaignId'
 import { Route as PaymentFailedRouteImport } from './routes/payment.failed'
@@ -78,6 +80,12 @@ const AuthenticatedCandidatesRoute = AuthenticatedCandidatesRouteImport.update({
   path: '/candidates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedContactCenterRoute =
+  AuthenticatedContactCenterRouteImport.update({
+    id: '/contact-center',
+    path: '/contact-center',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -96,6 +104,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPlansRoute = ApiPlansRouteImport.update({
@@ -229,10 +242,12 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/candidates': typeof AuthenticatedCandidatesRoute
+  '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kanban': typeof AuthenticatedKanbanRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
   '/payment/failed': typeof PaymentFailedRoute
@@ -264,10 +279,12 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/candidates': typeof AuthenticatedCandidatesRoute
+  '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kanban': typeof AuthenticatedKanbanRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
   '/payment/failed': typeof PaymentFailedRoute
@@ -300,10 +317,12 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/_authenticated/candidates': typeof AuthenticatedCandidatesRoute
+  '/_authenticated/contact-center': typeof AuthenticatedContactCenterRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/kanban': typeof AuthenticatedKanbanRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
   '/apply/$campaignId': typeof ApplyCampaignIdRoute
   '/payment/failed': typeof PaymentFailedRoute
@@ -337,10 +356,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/candidates'
+    | '/contact-center'
     | '/dashboard'
     | '/kanban'
     | '/onboarding'
     | '/settings'
+    | '/support'
     | '/api/plans'
     | '/apply/$campaignId'
     | '/payment/failed'
@@ -372,10 +393,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/candidates'
+    | '/contact-center'
     | '/dashboard'
     | '/kanban'
     | '/onboarding'
     | '/settings'
+    | '/support'
     | '/api/plans'
     | '/apply/$campaignId'
     | '/payment/failed'
@@ -407,10 +430,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/_authenticated/candidates'
+    | '/_authenticated/contact-center'
     | '/_authenticated/dashboard'
     | '/_authenticated/kanban'
     | '/_authenticated/onboarding'
     | '/_authenticated/settings'
+    | '/_authenticated/support'
     | '/api/plans'
     | '/apply/$campaignId'
     | '/payment/failed'
@@ -510,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCandidatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/contact-center': {
+      id: '/_authenticated/contact-center'
+      path: '/contact-center'
+      fullPath: '/contact-center'
+      preLoaderRoute: typeof AuthenticatedContactCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -536,6 +568,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/support': {
+      id: '/_authenticated/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof AuthenticatedSupportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/plans': {
@@ -725,10 +764,12 @@ const AuthenticatedCampaignsCampaignIdRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCandidatesRoute: typeof AuthenticatedCandidatesRoute
+  AuthenticatedContactCenterRoute: typeof AuthenticatedContactCenterRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedKanbanRoute: typeof AuthenticatedKanbanRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedApplicationsApplicationIdRoute: typeof AuthenticatedApplicationsApplicationIdRoute
   AuthenticatedCampaignsCampaignIdRoute: typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   AuthenticatedCampaignsNewRoute: typeof AuthenticatedCampaignsNewRoute
@@ -737,10 +778,12 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCandidatesRoute: AuthenticatedCandidatesRoute,
+  AuthenticatedContactCenterRoute: AuthenticatedContactCenterRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedKanbanRoute: AuthenticatedKanbanRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedApplicationsApplicationIdRoute:
     AuthenticatedApplicationsApplicationIdRoute,
   AuthenticatedCampaignsCampaignIdRoute:

@@ -2,20 +2,16 @@
  * Incident Management — server functions for creating, listing, updating,
  * and adding notes to support incidents.
  *
- * Incidents can be:
- *  - Auto-detected: system catches an error and creates an incident automatically
- *  - User-reported: user clicks "Report Issue" and submits details
- *  - Support-agent: created by internal support team
+ * Uses the standard requireSupabaseAuth middleware + from() from @/lib/db.
  */
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSupabaseClient } from "@/lib/supabase.server";
-import { requireAuth } from "@/lib/auth/session.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { from } from "@/lib/db";
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const PRIORITY_WEIGHTS = { critical: 0, high: 1, normal: 2, low: 3 };
 const SLA_HOURS = {
   critical: { response: 0.25, resolution: 4 },
   high: { response: 0.5, resolution: 8 },
@@ -23,31 +19,9 @@ const SLA_HOURS = {
   low: { response: 4, resolution: 48 },
 };
 
-const ISSUE_TYPES = [
-  "technical",
-  "incorrect_info",
-  "how_to_question",
-] as const;
-
-const CATEGORIES = [
-  "recruitment",
-  "communication",
-  "account",
-  "billing",
-  "integrations",
-  "documents",
-  "other",
-] as const;
-
 const STATUSES = [
-  "detected",
-  "open",
-  "acknowledged",
-  "investigating",
-  "waiting_for_customer",
-  "resolved",
-  "closed",
-  "reopened",
+  "detected", "open", "acknowledged", "investigating",
+  "waiting_for_customer", "resolved", "closed", "reopened",
 ] as const;
 
 // ─── Create Incident ────────────────────────────────────────────────
@@ -57,8 +31,8 @@ const createIncidentSchema = z.object({
   description: z.string().max(2000).optional(),
   source: z.enum(["user_reported", "auto_detected", "system_monitoring", "support_agent"]).default("user_reported"),
   priority: z.enum(["critical", "high", "normal", "low"]).default("normal"),
-  issue_type: z.enum(ISSUE_TYPES).default("technical"),
-  category: z.enum(CATEGORIES).default("other"),
+  issue_type: z.enum(["technical", "incorrect_info", "how_to_question"]).default("technical"),
+  category: z.enum(["recruitment", "communication", "account", "billing", "integrations", "documents", "other"]).default("other"),
   error_type: z.string().max(200).optional(),
   error_message: z.string().max(1000).optional(),
   campaign_id: z.string().uuid().optional(),
@@ -70,28 +44,28 @@ const createIncidentSchema = z.object({
 });
 
 export const createIncidentFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((input: unknown) => createIncidentSchema.parse(input))
-  .handler(async ({ data }) => {
-    const auth = await requireAuth();
-    if (!auth.tenantId) throw new Error("No workspace");
+  .handler(async ({ data, context }) => {
+    const { tenantId, userId } = context;
+    if (!tenantId) throw new Error("No workspace");
 
-    const supabase = await getSupabaseClient();
     const now = new Date().toISOString();
     const slaResponse = new Date(Date.now() + SLA_HOURS[data.priority].response * 3600000).toISOString();
     const slaResolution = new Date(Date.now() + SLA_HOURS[data.priority].resolution * 3600000).toISOString();
 
     // Get next incident number
-    const { data: lastIncident } = await supabase
-      .from("incidents" as any)
+    const lastIncident = await from("incidents")
       .select("incident_number")
       .order("incident_number", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const nextNumber = ((lastIncident as any)?.incident_number || 0) + 1;
+    const nextNumber = ((lastIncident as any)?.data?.incident_number || 0) + 1;
 
-    const incidentData = {
-      tenant_id: auth.tenantId,
+    const incidentData: Record<string, any> = {
+      id: crypto.randomUUID(),
+      tenant_id: tenantId,
       incident_number: nextNumber,
       source: data.source,
       priority: data.priority,
@@ -107,9 +81,9 @@ export const createIncidentFn = createServerFn({ method: "POST" })
       action: data.action || null,
       channel: data.channel || null,
       reference_ids: data.reference_ids ? JSON.stringify(data.reference_ids) : null,
-      reported_by: auth.userId,
-      reporter_name: auth.profile?.full_name || null,
-      reporter_email: auth.profile?.email || null,
+      reported_by: userId,
+      reporter_name: (context as any).claims?.email || null,
+      reporter_email: (context as any).claims?.email || null,
       screenshot_url: data.screenshot_url || null,
       sla_response_deadline: slaResponse,
       sla_resolution_deadline: slaResolution,
@@ -117,29 +91,26 @@ export const createIncidentFn = createServerFn({ method: "POST" })
       updated_at: now,
     };
 
-    const { data: incident, error } = await supabase
-      .from("incidents" as any)
-      .insert(incidentData as any)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[Incident] Create error:", error.message);
+    const result = await from("incidents").insert(incidentData as any);
+    if (result.error) {
+      console.error("[Incident] Create error:", result.error.message);
       throw new Error("Failed to create incident");
     }
 
     // Log the creation event
-    await supabase.from("incident_events" as any).insert({
-      incident_id: (incident as any).id,
+    await from("incident_events").insert({
+      id: crypto.randomUUID(),
+      incident_id: incidentData.id,
       event_type: "created",
       new_value: "open",
-      actor_id: auth.userId,
-      actor_name: auth.profile?.full_name || null,
+      actor_id: userId,
+      actor_name: (context as any).claims?.email || null,
       metadata: JSON.stringify({ source: data.source }),
+      created_at: now,
     } as any);
 
     return {
-      incident: incident as any,
+      incident: incidentData,
       referenceNumber: `OP-${String(nextNumber).padStart(5, "0")}`,
     };
   });
@@ -155,41 +126,36 @@ const listIncidentsSchema = z.object({
 });
 
 export const listIncidentsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((input: unknown) => listIncidentsSchema.parse(input ?? {}))
-  .handler(async ({ data }) => {
-    const auth = await requireAuth();
-    if (!auth.tenantId) throw new Error("No workspace");
+  .handler(async ({ data, context }) => {
+    const { tenantId } = context;
+    if (!tenantId) throw new Error("No workspace");
 
-    const supabase = await getSupabaseClient();
-    let query = supabase
-      .from("incidents" as any)
-      .select("*", { count: "exact" })
-      .eq("tenant_id", auth.tenantId)
-      .order("created_at", { ascending: false });
+    let query = from("incidents")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .eq("tenant_id", tenantId);
 
     if (data.status) query = query.eq("status", data.status);
     if (data.priority) query = query.eq("priority", data.priority);
     if (data.category) query = query.eq("category", data.category);
+    query = query.limit(data.limit);
 
-    const from = (data.page - 1) * data.limit;
-    const to = from + data.limit - 1;
-    query = query.range(from, to);
-
-    const { data: incidents, count, error } = await query;
+    const { data: incidents, error } = await query;
 
     if (error) {
       console.error("[Incident] List error:", error.message);
       throw new Error("Failed to list incidents");
     }
 
-    // Get summary counts
-    const { data: allIncidents } = await supabase
-      .from("incidents" as any)
+    // Get summary counts from all incidents for this tenant
+    const allResult = await from("incidents")
       .select("status, priority")
-      .eq("tenant_id", auth.tenantId);
+      .eq("tenant_id", tenantId);
 
     const summary = {
-      total: count || 0,
+      total: (incidents as any[])?.length || 0,
       open: 0,
       critical: 0,
       high: 0,
@@ -198,21 +164,21 @@ export const listIncidentsFn = createServerFn({ method: "GET" })
       byStatus: {} as Record<string, number>,
     };
 
-    if (allIncidents) {
-      for (const inc of allIncidents as any[]) {
-        summary.byStatus[inc.status] = (summary.byStatus[inc.status] || 0) + 1;
-        if (inc.status === "open" || inc.status === "detected" || inc.status === "acknowledged" || inc.status === "investigating" || inc.status === "reopened") {
-          summary.open++;
-        }
-        if (inc.priority in summary) {
-          (summary as any)[inc.priority]++;
-        }
+    const allRows = (allResult.data || []) as any[];
+    for (const inc of allRows) {
+      summary.byStatus[inc.status] = (summary.byStatus[inc.status] || 0) + 1;
+      if (["open", "detected", "acknowledged", "investigating", "reopened"].includes(inc.status)) {
+        summary.open++;
+      }
+      if (inc.priority in summary) {
+        (summary as any)[inc.priority]++;
       }
     }
+    summary.total = allRows.length;
 
     return {
       incidents: (incidents as any[]) || [],
-      total: count || 0,
+      total: summary.total,
       page: data.page,
       limit: data.limit,
       summary,
@@ -222,38 +188,34 @@ export const listIncidentsFn = createServerFn({ method: "GET" })
 // ─── Get Single Incident ────────────────────────────────────────────
 
 export const getIncidentFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
-    const auth = await requireAuth();
-    if (!auth.tenantId) throw new Error("No workspace");
+  .handler(async ({ data, context }) => {
+    const { tenantId } = context;
+    if (!tenantId) throw new Error("No workspace");
 
-    const supabase = await getSupabaseClient();
-
-    const { data: incident, error } = await supabase
-      .from("incidents" as any)
+    const { data: incident, error } = await from("incidents")
       .select("*")
       .eq("id", data.id)
-      .eq("tenant_id", auth.tenantId)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (error || !incident) throw new Error("Incident not found");
 
     // Get notes
-    const { data: notes } = await supabase
-      .from("incident_notes" as any)
+    const { data: notes } = await from("incident_notes")
       .select("*")
       .eq("incident_id", data.id)
       .order("created_at", { ascending: true });
 
     // Get timeline
-    const { data: timeline } = await supabase
-      .from("incident_events" as any)
+    const { data: timeline } = await from("incident_events")
       .select("*")
       .eq("incident_id", data.id)
       .order("created_at", { ascending: true });
 
     return {
-      incident: incident as any,
+      incident,
       notes: (notes as any[]) || [],
       timeline: (timeline as any[]) || [],
     };
@@ -270,30 +232,26 @@ const updateIncidentSchema = z.object({
 });
 
 export const updateIncidentFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((input: unknown) => updateIncidentSchema.parse(input))
-  .handler(async ({ data }) => {
-    const auth = await requireAuth();
-    if (!auth.tenantId) throw new Error("No workspace");
+  .handler(async ({ data, context }) => {
+    const { tenantId, userId } = context;
+    if (!tenantId) throw new Error("No workspace");
 
-    const supabase = await getSupabaseClient();
     const now = new Date().toISOString();
     const updates: Record<string, any> = { updated_at: now };
 
-    // Get current incident for comparison
-    const { data: current } = await supabase
-      .from("incidents" as any)
+    // Get current incident
+    const { data: current } = await from("incidents")
       .select("status, priority")
       .eq("id", data.id)
-      .eq("tenant_id", auth.tenantId)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (data.status) {
       updates.status = data.status;
       if (data.status === "acknowledged") updates.acknowledged_at = now;
-      if (data.status === "resolved") {
-        updates.resolved_at = now;
-        updates.sla_met = true; // simplified
-      }
+      if (data.status === "resolved") { updates.resolved_at = now; updates.sla_met = true; }
       if (data.status === "closed") updates.closed_at = now;
     }
 
@@ -301,39 +259,44 @@ export const updateIncidentFn = createServerFn({ method: "POST" })
     if (data.assigned_to !== undefined) updates.assigned_to = data.assigned_to;
     if (data.resolution_note) updates.resolution_note = data.resolution_note;
 
-    const { error } = await supabase
-      .from("incidents" as any)
+    const { error } = await from("incidents")
       .update(updates)
       .eq("id", data.id)
-      .eq("tenant_id", auth.tenantId);
+      .eq("tenant_id", tenantId);
 
     if (error) throw new Error("Failed to update incident");
 
-    // Log status change
+    // Log events
     const events: any[] = [];
     if (data.status && current && (current as any).status !== data.status) {
       events.push({
+        id: crypto.randomUUID(),
         incident_id: data.id,
         event_type: "status_change",
         old_value: (current as any).status,
         new_value: data.status,
-        actor_id: auth.userId,
-        actor_name: auth.profile?.full_name || null,
+        actor_id: userId,
+        actor_name: (context as any).claims?.email || null,
+        created_at: now,
       });
     }
     if (data.priority && current && (current as any).priority !== data.priority) {
       events.push({
+        id: crypto.randomUUID(),
         incident_id: data.id,
         event_type: "priority_change",
         old_value: (current as any).priority,
         new_value: data.priority,
-        actor_id: auth.userId,
-        actor_name: auth.profile?.full_name || null,
+        actor_id: userId,
+        actor_name: (context as any).claims?.email || null,
+        created_at: now,
       });
     }
 
     if (events.length) {
-      await supabase.from("incident_events" as any).insert(events as any);
+      for (const event of events) {
+        await from("incident_events").insert(event);
+      }
     }
 
     return { ok: true };
@@ -348,116 +311,37 @@ const addNoteSchema = z.object({
 });
 
 export const addIncidentNoteFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((input: unknown) => addNoteSchema.parse(input))
-  .handler(async ({ data }) => {
-    const auth = await requireAuth();
-    if (!auth.tenantId) throw new Error("No workspace");
+  .handler(async ({ data, context }) => {
+    const { tenantId, userId } = context;
+    if (!tenantId) throw new Error("No workspace");
 
-    const supabase = await getSupabaseClient();
+    const now = new Date().toISOString();
 
-    const { error } = await supabase.from("incident_notes" as any).insert({
+    const { error } = await from("incident_notes").insert({
+      id: crypto.randomUUID(),
       incident_id: data.incident_id,
-      author_id: auth.userId,
-      author_name: auth.profile?.full_name || null,
+      author_id: userId,
+      author_name: (context as any).claims?.email || null,
       author_role: "support",
       body: data.body,
       is_internal: data.is_internal,
+      created_at: now,
     } as any);
 
     if (error) throw new Error("Failed to add note");
 
     // Log the event
-    await supabase.from("incident_events" as any).insert({
+    await from("incident_events").insert({
+      id: crypto.randomUUID(),
       incident_id: data.incident_id,
       event_type: "note_added",
-      actor_id: auth.userId,
-      actor_name: auth.profile?.full_name || null,
+      actor_id: userId,
+      actor_name: (context as any).claims?.email || null,
       metadata: JSON.stringify({ is_internal: data.is_internal }),
+      created_at: now,
     } as any);
 
     return { ok: true };
   });
-
-// ─── Auto-detect Error Helper ───────────────────────────────────────
-// Call this from any workflow that encounters an error to automatically
-// create an incident with full context.
-
-export async function autoCreateIncident(params: {
-  tenantId: string;
-  userId: string;
-  userName?: string;
-  title: string;
-  errorType: string;
-  errorMessage: string;
-  campaignId?: string;
-  candidateId?: string;
-  action: string;
-  channel?: string;
-  priority?: "critical" | "high" | "normal" | "low";
-  category?: string;
-}) {
-  try {
-    const supabase = await getSupabaseClient();
-    const now = new Date().toISOString();
-    const priority = params.priority || "normal";
-    const slaResponse = new Date(Date.now() + SLA_HOURS[priority].response * 3600000).toISOString();
-    const slaResolution = new Date(Date.now() + SLA_HOURS[priority].resolution * 3600000).toISOString();
-
-    const { data: lastIncident } = await supabase
-      .from("incidents" as any)
-      .select("incident_number")
-      .order("incident_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const nextNumber = ((lastIncident as any)?.incident_number || 0) + 1;
-
-    const { data: incident, error } = await supabase
-      .from("incidents" as any)
-      .insert({
-        tenant_id: params.tenantId,
-        incident_number: nextNumber,
-        source: "auto_detected",
-        priority,
-        status: "detected",
-        issue_type: "technical",
-        category: params.category || "other",
-        title: params.title,
-        error_type: params.errorType,
-        error_message: params.errorMessage?.slice(0, 1000) || null,
-        campaign_id: params.campaignId || null,
-        candidate_id: params.candidateId || null,
-        action: params.action,
-        channel: params.channel || null,
-        reported_by: params.userId,
-        reporter_name: params.userName || null,
-        sla_response_deadline: slaResponse,
-        sla_resolution_deadline: slaResolution,
-        created_at: now,
-        updated_at: now,
-      } as any)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[AutoIncident] Failed:", error.message);
-      return null;
-    }
-
-    // Log creation event
-    await supabase.from("incident_events" as any).insert({
-      incident_id: (incident as any).id,
-      event_type: "created",
-      new_value: "detected",
-      metadata: JSON.stringify({ source: "auto_detected", action: params.action }),
-    } as any);
-
-    return {
-      id: (incident as any).id,
-      referenceNumber: `OP-${String(nextNumber).padStart(5, "0")}`,
-    };
-  } catch (err) {
-    console.error("[AutoIncident] Error:", err);
-    return null;
-  }
-}

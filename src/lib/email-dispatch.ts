@@ -162,7 +162,7 @@ async function autoIncident(
     const { autoCreateIncident } = await import("@/lib/incident.functions");
     // We can't call createServerFn from here directly, so we use the
     // underlying autoCreateIncident helper which works outside server fn context.
-    const supabase = await import("@/lib/supabase.server").then((m) => m.getSupabaseClient());
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
     const now = new Date().toISOString();
 
     const { data: lastIncident } = await supabase

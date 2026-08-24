@@ -10,7 +10,8 @@ import {
   type OrsThresholds,
   type ScoredQuestion,
 } from "@/lib/ors";
-import { scoreApplicationV2, type CampaignScoringModel, type CandidateScoringInput } from "@/lib/ors-scoring-v2";
+import { scoreApplicationV2 } from "@/lib/ors-scoring-v2";
+import type { CampaignScoringModel, CandidateScoringInput } from "@/lib/ors-requirements";
 import { renderEmail, resolveEmailTemplate } from "@/lib/email-templates";
 import { applyAutoPipeline } from "@/lib/auto-pipeline";
 

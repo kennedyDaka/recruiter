@@ -1,31 +1,53 @@
 /**
- * ORS Scoring Engine v2 — Requirement-based eligibility + ranking.
+ * ORS Scoring Engine v3 — Requirement-based eligibility + ranking.
  *
  * Architecture:
- *   CANDIDATE INPUT → RAW ANSWERS → NORMALIZATION → CLASSIFICATION → SCORING → ELIGIBILITY + SCORE
+ *   CANDIDATE INPUT → RAW ANSWERS → NORMALIZATION → CLASSIFICATION → SCORING
+ *                                                                  ↓
+ *                                                          ELIGIBILITY (pass/fail/review)
+ *                                                          SCORE (0-100)
+ *                                                          CONFIDENCE (high/medium/low)
  *
- * The candidate never sees which answers give higher scores.
- * The recruiter defines the rules; the candidate simply reports their
- * actual qualifications, experience, and skills.
- *
- * Two outputs:
- *   A. Eligibility: ELIGIBLE / INELIGIBLE / REQUIRES_REVIEW
- *   B. Score: 0-100 (only meaningful for eligible candidates)
+ * Golden rules:
+ *   1. Unknown data triggers investigation, not automatic rejection
+ *   2. Missing information → UNKNOWN, never automatically penalized
+ *   3. Relevance determines ranking, not just presence
+ *   4. Candidate answers are collected independently of scoring rules
+ *   5. Never hard-code rules — recruiter defines rules per job
  */
 
 import type {
   RequirementGroup,
   CampaignScoringModel,
   CandidateScoringInput,
+  CandidateEducation,
+  CandidateExperience,
+  CandidateSkill,
   ScoringResult,
   EligibilityResult,
   EligibilityGate,
   ScoreBreakdown,
   GroupScore,
   ScoringWeights,
+  MatchLevel,
+  MatchOperator,
+  Confidence,
+  EducationRelevance,
+  ExperienceRelevance,
+  SkillMatch,
 } from "./ors-requirements";
-import { DEFAULT_SCORING_WEIGHTS } from "./ors-requirements";
-import { normalizeOccupation, normalizeSkill, type NormalizedOccupation, type NormalizedSkill } from "./ors-normalization";
+import {
+  DEFAULT_SCORING_WEIGHTS,
+  ratioToMatchLevel,
+  matchLevelScore,
+  calculateConfidence,
+} from "./ors-requirements";
+import {
+  normalizeOccupation,
+  normalizeField,
+  normalizeSkill,
+  normalizeIndustry,
+} from "./ors-normalization";
 
 // ─── Qualification Levels ───────────────────────────────────────────
 
@@ -66,7 +88,7 @@ function qualName(rank: number): string {
   return "unknown";
 }
 
-// ─── Normalization ──────────────────────────────────────────────────
+// ─── Text Normalization ─────────────────────────────────────────────
 
 function normalise(value: string): string {
   return value
@@ -92,28 +114,170 @@ function termOverlap(a: string, b: string): number {
   return termsA.filter((t) => setB.has(t)).length / termsA.length;
 }
 
-function valueMatchesAny(candidateValue: string, acceptedValues: string[]): number {
+function valueMatchesAny(candidateValue: string, acceptedValues: string[]): { ratio: number; level: MatchLevel } {
   const normalised = normalise(candidateValue);
-  let best = 0;
+  let bestRatio = 0;
   for (const accepted of acceptedValues) {
     const overlap = termOverlap(accepted, candidateValue);
-    if (overlap >= 0.75) return 1; // Exact/near-exact match
-    if (overlap >= 0.5) best = Math.max(best, 0.7); // Related
-    if (overlap >= 0.33) best = Math.max(best, 0.4); // Weakly related
+    if (overlap >= 0.75) return { ratio: 1, level: "exact" };
+    if (overlap >= 0.5) bestRatio = Math.max(bestRatio, 0.7);
+    if (overlap >= 0.33) bestRatio = Math.max(bestRatio, 0.4);
   }
-  return best;
+  return { ratio: bestRatio, level: ratioToMatchLevel(bestRatio) };
 }
 
-// ─── Eligibility Evaluation ─────────────────────────────────────────
+// ─── Education Relevance ────────────────────────────────────────────
+
+function classifyEducationRelevance(
+  fieldOfStudy: string,
+  acceptedFields: string[],
+): { relevance: EducationRelevance; score: number; evidence: string[] } {
+  if (!fieldOfStudy || !acceptedFields.length) {
+    return { relevance: "unknown", score: 0.5, evidence: ["No field data available"] };
+  }
+
+  const { ratio, level } = valueMatchesAny(fieldOfStudy, acceptedFields);
+
+  if (ratio >= 0.9) return { relevance: "exact", score: 1.0, evidence: [`Exact match: ${fieldOfStudy}`] };
+  if (ratio >= 0.7) return { relevance: "very_related", score: 0.9, evidence: [`Very related: ${fieldOfStudy}`] };
+  if (ratio >= 0.5) return { relevance: "related", score: 0.7, evidence: [`Related: ${fieldOfStudy}`] };
+  if (ratio >= 0.3) return { relevance: "weakly_related", score: 0.3, evidence: [`Weakly related: ${fieldOfStudy}`] };
+  return { relevance: "unrelated", score: 0, evidence: [`Unrelated: ${fieldOfStudy}`] };
+}
+
+// ─── Experience Relevance ───────────────────────────────────────────
+
+function classifyExperienceRelevance(
+  entry: CandidateExperience,
+  targetOccupation: string,
+  highlyRelevant: string[],
+  related: string[],
+): { relevance: ExperienceRelevance; score: number; evidence: string[] } {
+  const title = entry.title || "";
+  const field = entry.field || "";
+
+  // Check highly relevant positions first
+  const highMatch = valueMatchesAny(title, highlyRelevant);
+  if (highMatch.ratio >= 0.7) {
+    return { relevance: "exact", score: 1.0, evidence: [`Exact role match: ${title}`] };
+  }
+
+  // Check related positions
+  const relMatch = valueMatchesAny(title, related);
+  if (relMatch.ratio >= 0.7) {
+    return { relevance: "directly_related", score: 0.9, evidence: [`Directly related role: ${title}`] };
+  }
+
+  // Check field of work
+  if (field) {
+    const fieldMatch = valueMatchesAny(field, [...highlyRelevant, ...related]);
+    if (fieldMatch.ratio >= 0.5) {
+      return { relevance: "strongly_related", score: 0.75, evidence: [`Strongly related field: ${field}`] };
+    }
+  }
+
+  // Check similarity to target occupation
+  const targetMatch = valueMatchesAny(title, [targetOccupation]);
+  if (targetMatch.ratio >= 0.5) {
+    return { relevance: "related", score: 0.5, evidence: [`Related to target: ${title}`] };
+  }
+
+  // Check for weak connection via field
+  if (field) {
+    const weakFieldMatch = valueMatchesAny(field, [targetOccupation]);
+    if (weakFieldMatch.ratio >= 0.3) {
+      return { relevance: "weakly_related", score: 0.25, evidence: [`Weakly related: ${title} in ${field}`] };
+    }
+  }
+
+  // Unknown — cannot determine
+  return { relevance: "unknown", score: 0.5, evidence: [`Unknown relevance: ${title}`] };
+}
+
+// ─── Skill Match ────────────────────────────────────────────────────
+
+function classifySkillMatch(
+  candidateSkill: string,
+  requiredSkill: string,
+): { match: SkillMatch; score: number; evidence: string[] } {
+  const { ratio } = valueMatchesAny(candidateSkill, [requiredSkill]);
+
+  if (ratio >= 0.9) return { match: "exact", score: 1.0, evidence: [`Exact skill: ${candidateSkill}`] };
+  if (ratio >= 0.7) return { match: "equivalent", score: 0.9, evidence: [`Equivalent skill: ${candidateSkill}`] };
+  if (ratio >= 0.5) return { match: "related", score: 0.7, evidence: [`Related skill: ${candidateSkill}`] };
+  if (ratio >= 0.3) return { match: "partial", score: 0.4, evidence: [`Partial match: ${candidateSkill}`] };
+  return { match: "unrelated", score: 0, evidence: [] };
+}
+
+// ─── Experience Duration ────────────────────────────────────────────
+
+function calculateRelevantYears(
+  entries: CandidateExperience[],
+  acceptedValues: string[],
+  recencyYears?: number,
+): { totalYears: number; recentYears: number; entries: CandidateExperience[] } {
+  let totalYears = 0;
+  let recentYears = 0;
+  const relevant: CandidateExperience[] = [];
+  const now = new Date();
+
+  for (const entry of entries) {
+    const entryField = entry.field || entry.title;
+    let isRelevant = false;
+
+    if (acceptedValues.length === 0) {
+      // No specific areas — all experience counts
+      isRelevant = true;
+    } else {
+      for (const accepted of acceptedValues) {
+        if (valueMatchesAny(entryField, [accepted]).ratio >= 0.5) {
+          isRelevant = true;
+          break;
+        }
+      }
+    }
+
+    if (!isRelevant) continue;
+
+    const years = entry.years || estimateYears(entry.startDate, entry.endDate, entry.isCurrent);
+    totalYears += years;
+    relevant.push(entry);
+
+    // Check recency
+    if (recencyYears && entry.endDate) {
+      const endDate = new Date(entry.endDate);
+      const yearsSinceEnd = (now.getTime() - endDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      if (yearsSinceEnd <= recencyYears) {
+        recentYears += years;
+      }
+    } else if (recencyYears && entry.isCurrent) {
+      recentYears += years; // Current position is always recent
+    }
+  }
+
+  return { totalYears, recentYears, entries: relevant };
+}
+
+function estimateYears(start?: string, end?: string, isCurrent?: boolean): number {
+  if (!start) return 0;
+  const startDate = new Date(start);
+  const endDate = isCurrent ? new Date() : end ? new Date(end) : new Date();
+  const diffMs = endDate.getTime() - startDate.getTime();
+  return Math.max(0, diffMs / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+// ─── Eligibility Engine ─────────────────────────────────────────────
 
 function evaluateEligibility(
   groups: RequirementGroup[],
   candidate: CandidateScoringInput,
 ): EligibilityResult {
   const gates: EligibilityGate[] = [];
+  const reasons: string[] = [];
+  let hasUnknown = false;
 
   for (const group of groups) {
-    if (group.level !== "required") continue; // Only required groups create gates
+    if (group.state === "informational") continue; // Informational never blocks
 
     let passed = false;
     let reason = "";
@@ -123,6 +287,7 @@ function evaluateEligibility(
         const candidateRank = qualLevel(candidate.highestQualification);
         const requiredRank = group.minLevel ? qualLevel(group.minLevel) : 0;
         const requiredName = group.acceptedValues[0] || qualName(requiredRank);
+
         if (requiredRank === 0) {
           passed = true;
           reason = "No minimum qualification set";
@@ -141,56 +306,56 @@ function evaluateEligibility(
           passed = true;
           reason = "No field restriction";
         } else {
-          const candidateFields = (candidate.fieldsOfStudy || []).map(normalise);
-          let bestMatch = 0;
-          for (const field of candidateFields) {
-            for (const accepted of group.acceptedValues) {
-              bestMatch = Math.max(bestMatch, valueMatchesAny(field, [accepted]));
+          const fields = candidate.fieldsOfStudy || [];
+          if (fields.length === 0) {
+            // Unknown — triggers review, not automatic fail
+            hasUnknown = true;
+            passed = group.state !== "required";
+            reason = "No field of study information provided";
+          } else {
+            let bestMatch = 0;
+            for (const field of fields) {
+              const { ratio } = valueMatchesAny(field, group.acceptedValues);
+              bestMatch = Math.max(bestMatch, ratio);
             }
+            passed = bestMatch >= 0.5;
+            reason = passed
+              ? "Field of study matches one of the accepted areas"
+              : `Field of study doesn't match any accepted area`;
           }
-          passed = bestMatch >= 0.5;
-          reason = passed
-            ? `Field of study matches one of the accepted areas`
-            : `Field of study (${candidate.fieldsOfStudy?.join(", ") || "none"}) doesn't match any accepted area`;
         }
         break;
       }
 
       case "experience_area": {
         const minYears = group.minYears || 0;
-        const candidateYears = candidate.yearsExperience || 0;
+        const entries = candidate.experienceEntries || [];
+        const { totalYears } = calculateRelevantYears(entries, group.acceptedValues);
 
-        if (group.acceptedValues.length === 0) {
-          // No specific areas required — just check years
-          passed = candidateYears >= minYears;
+        if (entries.length === 0) {
+          // Unknown — triggers review
+          hasUnknown = true;
+          passed = group.state !== "required";
+          reason = "No experience information provided";
+        } else if (group.acceptedValues.length === 0) {
+          passed = totalYears >= minYears;
           reason = passed
-            ? `${candidateYears} years meets the ${minYears} year minimum`
-            : `Requires ${minYears} years; candidate has ${candidateYears}`;
+            ? `${Math.round(totalYears)} years meets the ${minYears} year minimum`
+            : `Requires ${minYears} years; candidate has ${Math.round(totalYears)}`;
         } else {
-          // Check if candidate has experience in ANY of the accepted areas
-          const entries = candidate.experienceEntries || [];
-          let totalRelevantYears = 0;
-          for (const entry of entries) {
-            const entryField = entry.field || entry.title;
-            for (const accepted of group.acceptedValues) {
-              if (valueMatchesAny(entryField, [accepted]) >= 0.5) {
-                totalRelevantYears += entry.years || 0;
-              }
-            }
-          }
-          passed = totalRelevantYears >= minYears;
+          passed = totalYears >= minYears;
           reason = passed
-            ? `${Math.round(totalRelevantYears * 10) / 10} years in relevant areas meets the ${minYears} year minimum`
-            : `Requires ${minYears} years in ${group.acceptedValues.slice(0, 3).join(", ")}; candidate has ${Math.round(totalRelevantYears * 10) / 10}`;
+            ? `${Math.round(totalYears)} years in relevant areas meets the ${minYears} year minimum`
+            : `Requires ${minYears} years in relevant areas; candidate has ${Math.round(totalYears)}`;
         }
         break;
       }
 
       case "skill_critical": {
-        const candidateSkills = (candidate.skills || []).map(normalise);
+        const skills = (candidate.skills || []).map(normalise);
         const missing: string[] = [];
         for (const skill of group.acceptedValues) {
-          const has = candidateSkills.some((s) => valueMatchesAny(s, [skill]) >= 0.5);
+          const has = skills.some((s) => valueMatchesAny(s, [skill]).ratio >= 0.5);
           if (!has) missing.push(skill);
         }
         passed = missing.length === 0;
@@ -201,24 +366,25 @@ function evaluateEligibility(
       }
 
       case "skill_required": {
-        const candidateSkills = (candidate.skills || []).map(normalise);
+        const skills = (candidate.skills || []).map(normalise);
         let matched = 0;
         for (const skill of group.acceptedValues) {
-          const has = candidateSkills.some((s) => valueMatchesAny(s, [skill]) >= 0.5);
+          const has = skills.some((s) => valueMatchesAny(s, [skill]).ratio >= 0.5);
           if (has) matched++;
         }
-        passed = matched >= group.minMatch;
+        const minRequired = group.operator === "x_of" ? group.minMatch : group.acceptedValues.length;
+        passed = matched >= minRequired;
         reason = passed
-          ? `${matched} of ${group.minMatch} required skills matched`
-          : `Only ${matched} of ${group.minMatch} required skills found`;
+          ? `${matched} of ${minRequired} required skills matched`
+          : `Only ${matched} of ${minRequired} required skills found`;
         break;
       }
 
       case "certification": {
-        const candidateCerts = (candidate.certifications || []).map(normalise);
+        const certs = (candidate.certifications || []).map(normalise);
         const missing: string[] = [];
         for (const cert of group.acceptedValues) {
-          const has = candidateCerts.some((c) => valueMatchesAny(c, [cert]) >= 0.5);
+          const has = certs.some((c) => valueMatchesAny(c, [cert]).ratio >= 0.5);
           if (!has) missing.push(cert);
         }
         passed = missing.length === 0;
@@ -234,10 +400,25 @@ function evaluateEligibility(
           reason = "No location restriction";
         } else {
           const country = normalise(candidate.country || "");
-          passed = group.acceptedValues.some((v) => valueMatchesAny(country, [v]) >= 0.5);
+          const { ratio } = valueMatchesAny(country, group.acceptedValues);
+          passed = ratio >= 0.5;
           reason = passed
             ? `Located in ${candidate.country}`
-            : `Located outside accepted countries (${group.acceptedValues.join(", ")})`;
+            : `Located outside accepted countries`;
+        }
+        break;
+      }
+
+      case "industry": {
+        if (!group.acceptedValues.length) {
+          passed = true;
+          reason = "No industry restriction";
+        } else {
+          const { ratio } = valueMatchesAny(candidate.industry || "", group.acceptedValues);
+          passed = ratio >= 0.5;
+          reason = passed
+            ? `Industry matches`
+            : `Industry doesn't match accepted areas`;
         }
         break;
       }
@@ -247,11 +428,27 @@ function evaluateEligibility(
         reason = "No evaluation needed";
     }
 
-    gates.push({ name: group.name, passed, reason, level: "required" });
+    gates.push({ name: group.name, passed, reason, state: group.state });
+
+    if (!passed && group.state === "required") {
+      reasons.push(`FAIL: ${group.name} — ${reason}`);
+    }
   }
 
-  const eligible = gates.every((g) => g.passed);
-  return { eligible, gates };
+  const allRequiredPassed = gates
+    .filter((g) => g.state === "required")
+    .every((g) => g.passed);
+
+  const status: "pass" | "fail" | "review" = allRequiredPassed
+    ? hasUnknown ? "review" : "pass"
+    : "fail";
+
+  return {
+    eligible: allRequiredPassed,
+    status,
+    gates,
+    reasons,
+  };
 }
 
 // ─── Score Evaluation ───────────────────────────────────────────────
@@ -260,6 +457,7 @@ function evaluateDimensionScore(
   groups: RequirementGroup[],
   candidate: CandidateScoringInput,
   dimension: string,
+  model: CampaignScoringModel,
 ): { score: number; max: number; groups: GroupScore[]; reasons: string[] } {
   const groupScores: GroupScore[] = [];
   const reasons: string[] = [];
@@ -268,144 +466,203 @@ function evaluateDimensionScore(
 
   for (const group of groups) {
     let score = 0;
-    let max = 100; // Each group scored 0-100 internally
+    let max = 100;
     let matched = 0;
     let required = group.minMatch || 1;
     let passed = false;
+    let matchLevel: MatchLevel = "unknown";
+    const evidence: string[] = [];
 
     switch (group.type) {
       case "education_level": {
         const candidateRank = qualLevel(candidate.highestQualification);
         const requiredRank = group.minLevel ? qualLevel(group.minLevel) : 0;
+
         if (requiredRank === 0) {
           score = candidateRank > 0 ? 100 : 50;
         } else if (candidateRank >= requiredRank) {
+          // Exceeds requirement — cap at 100, small bonus for higher level
           const excess = Math.min(candidateRank - requiredRank, 3);
           score = Math.min(100, 100 + excess * 5);
+          matchLevel = "exact";
         } else {
+          // Below requirement — penalty proportional to gap
           const gap = requiredRank - candidateRank;
           score = gap === 1 ? 60 : gap === 2 ? 30 : 10;
+          matchLevel = gap === 1 ? "weakly_related" : "unrelated";
         }
         passed = score >= 60;
-        reasons.push(`Education: ${candidate.highestQualification || "None"} → ${Math.round(score)}%`);
+        evidence.push(`${candidate.highestQualification || "None"} → ${Math.round(score)}%`);
         break;
       }
 
       case "education_field": {
         if (!group.acceptedValues.length) {
-          score = 80; // No preference: decent score
+          score = 80;
           passed = true;
+          matchLevel = "related";
+          evidence.push("No field preference → 80%");
         } else {
-          const candidateFields = candidate.fieldsOfStudy || [];
-          let bestMatch = 0;
-          for (const field of candidateFields) {
-            for (const accepted of group.acceptedValues) {
-              bestMatch = Math.max(bestMatch, valueMatchesAny(field, [accepted]));
+          const fields = candidate.fieldsOfStudy || [];
+          let bestRelevance = { relevance: "unknown" as EducationRelevance, score: 0.5, evidence: ["No field data"] };
+
+          for (const field of fields) {
+            const rel = classifyEducationRelevance(field, group.acceptedValues);
+            if (rel.score > bestRelevance.score) {
+              bestRelevance = rel;
             }
           }
-          score = Math.round(bestMatch * 100);
+
+          score = Math.round(bestRelevance.score * 100);
+          matchLevel = ratioToMatchLevel(bestRelevance.score);
           passed = score >= 50;
-          if (score >= 80) reasons.push(`Field of study: strong match`);
-          else if (score >= 50) reasons.push(`Field of study: related match`);
-          else reasons.push(`Field of study: weak match`);
+          evidence.push(...bestRelevance.evidence);
         }
         break;
       }
 
       case "experience_area": {
         const minYears = group.minYears || 0;
-        const candidateYears = candidate.yearsExperience || 0;
         const entries = candidate.experienceEntries || [];
+        const recencyYears = model.experienceRecencyYears || undefined;
 
         if (group.acceptedValues.length === 0) {
-          // Generic experience: score by years
+          // Generic experience
+          const candidateYears = candidate.yearsExperience || 0;
           score = minYears > 0
             ? Math.min(100, (candidateYears / minYears) * 100)
             : Math.min(100, (candidateYears / 3) * 100);
           matched = candidateYears >= minYears ? 1 : 0;
           required = 1;
+          matchLevel = candidateYears >= minYears ? "exact" : "weakly_related";
+          evidence.push(`${candidateYears} years experience`);
         } else {
-          // Score by relevance + years
-          let relevantYears = 0;
-          for (const entry of entries) {
-            const entryField = entry.field || entry.title;
-            for (const accepted of group.acceptedValues) {
-              if (valueMatchesAny(entryField, [accepted]) >= 0.5) {
-                relevantYears += entry.years || 0;
-                matched++;
-              }
-            }
+          // Score by relevance + years + recency
+          const { totalYears, recentYears, entries: relevantEntries } = calculateRelevantYears(
+            entries, group.acceptedValues, recencyYears,
+          );
+
+          // Years score
+          const yearsRatio = minYears > 0
+            ? Math.min(1, totalYears / minYears)
+            : Math.min(1, totalYears / 3);
+
+          // Relevance score — average relevance of relevant entries
+          let relevanceSum = 0;
+          for (const entry of relevantEntries) {
+            const rel = classifyExperienceRelevance(
+              entry, model.targetOccupation || "",
+              model.highlyRelevantPositions || [], model.relatedPositions || [],
+            );
+            relevanceSum += rel.score;
+            evidence.push(...rel.evidence);
           }
-          const yearsScore = minYears > 0
-            ? Math.min(100, (relevantYears / minYears) * 100)
-            : Math.min(100, (relevantYears / 3) * 100);
-          const coverageScore = (matched / Math.max(group.acceptedValues.length, 1)) * 100;
-          score = Math.round(yearsScore * 0.7 + coverageScore * 0.3);
-          passed = relevantYears >= minYears;
+          const avgRelevance = relevantEntries.length > 0
+            ? relevanceSum / relevantEntries.length
+            : 0;
+
+          // Recency score
+          const recencyRatio = recencyYears
+            ? (totalYears > 0 ? recentYears / totalYears : 0)
+            : 1; // No recency penalty if not configured
+
+          // Combined score: 50% years + 30% relevance + 20% recency
+          score = Math.round((yearsRatio * 50 + avgRelevance * 30 + recencyRatio * 20) * 100) / 100;
+          matchLevel = ratioToMatchLevel(avgRelevance);
+          matched = totalYears >= minYears ? 1 : 0;
           required = 1;
-          matched = passed ? 1 : 0;
-          reasons.push(`Experience: ${Math.round(relevantYears * 10) / 10} years relevant → ${Math.round(score)}%`);
+          evidence.push(`${Math.round(totalYears * 10) / 10} years relevant (${Math.round(recentYears)} recent) → ${Math.round(score)}%`);
         }
         break;
       }
 
       case "skill_critical": {
-        const candidateSkills = (candidate.skills || []).map(normalise);
+        const skills = (candidate.skills || []).map(normalise);
         let matchedCount = 0;
         for (const skill of group.acceptedValues) {
-          const has = candidateSkills.some((s) => valueMatchesAny(s, [skill]) >= 0.5);
-          if (has) matchedCount++;
+          let bestMatch: SkillMatch = "unrelated";
+          let bestScore = 0;
+          for (const s of skills) {
+            const { match, score: mScore } = classifySkillMatch(s, skill);
+            if (mScore > bestScore) {
+              bestMatch = match;
+              bestScore = mScore;
+            }
+          }
+          if (bestScore >= 0.5) {
+            matchedCount++;
+            evidence.push(`Critical: ${skill} → ${bestMatch}`);
+          }
         }
         matched = matchedCount;
         required = group.acceptedValues.length;
         score = required > 0 ? Math.round((matched / required) * 100) : 100;
+        matchLevel = matched >= required ? "exact" : matched > 0 ? "related" : "unrelated";
         passed = matched >= required;
-        reasons.push(`Critical skills: ${matched}/${required} → ${score}%`);
+        evidence.push(`Critical skills: ${matched}/${required} → ${score}%`);
         break;
       }
 
       case "skill_required": {
-        const candidateSkills = (candidate.skills || []).map(normalise);
+        const skills = (candidate.skills || []).map(normalise);
         let matchedCount = 0;
         for (const skill of group.acceptedValues) {
-          const has = candidateSkills.some((s) => valueMatchesAny(s, [skill]) >= 0.5);
+          const has = skills.some((s) => valueMatchesAny(s, [skill]).ratio >= 0.5);
           if (has) matchedCount++;
         }
         matched = matchedCount;
-        required = group.minMatch || 1;
+        required = group.operator === "x_of" ? group.minMatch : group.acceptedValues.length;
         score = required > 0 ? Math.min(100, Math.round((matched / required) * 100)) : 100;
+        matchLevel = matched >= required ? "exact" : matched > 0 ? "related" : "unrelated";
         passed = matched >= required;
-        reasons.push(`Required skills: ${matched}/${required} → ${score}%`);
+        evidence.push(`Required skills: ${matched}/${required} → ${score}%`);
         break;
       }
 
       case "skill_preferred": {
-        const candidateSkills = (candidate.skills || []).map(normalise);
+        const skills = (candidate.skills || []).map(normalise);
         let matchedCount = 0;
         for (const skill of group.acceptedValues) {
-          const has = candidateSkills.some((s) => valueMatchesAny(s, [skill]) >= 0.5);
+          const has = skills.some((s) => valueMatchesAny(s, [skill]).ratio >= 0.5);
           if (has) matchedCount++;
         }
         matched = matchedCount;
         required = group.acceptedValues.length;
         score = required > 0 ? Math.round((matched / required) * 100) : 0;
+        matchLevel = matched > 0 ? "related" : "unknown";
         passed = true; // Preferred skills never block eligibility
-        if (score > 0) reasons.push(`Preferred skills: ${matched}/${required} bonus`);
+        if (score > 0) evidence.push(`Preferred skills: ${matched}/${required} bonus`);
         break;
       }
 
       case "certification": {
-        const candidateCerts = (candidate.certifications || []).map(normalise);
+        const certs = (candidate.certifications || []).map(normalise);
         let matchedCount = 0;
         for (const cert of group.acceptedValues) {
-          const has = candidateCerts.some((c) => valueMatchesAny(c, [cert]) >= 0.5);
+          const has = certs.some((c) => valueMatchesAny(c, [cert]).ratio >= 0.5);
           if (has) matchedCount++;
         }
         matched = matchedCount;
         required = group.acceptedValues.length;
         score = required > 0 ? Math.round((matched / required) * 100) : 0;
+        matchLevel = matched >= required ? "exact" : matched > 0 ? "related" : "unrelated";
         passed = matched >= required;
-        if (score > 0) reasons.push(`Certifications: ${matched}/${required} → ${score}%`);
+        if (score > 0) evidence.push(`Certifications: ${matched}/${required} → ${score}%`);
+        break;
+      }
+
+      case "industry": {
+        if (!group.acceptedValues.length) {
+          score = 100;
+          passed = true;
+          matchLevel = "exact";
+        } else {
+          const { ratio, level } = valueMatchesAny(candidate.industry || "", group.acceptedValues);
+          score = Math.round(ratio * 100);
+          matchLevel = level;
+          passed = ratio >= 0.5;
+          evidence.push(`Industry: ${candidate.industry || "Unknown"} → ${matchLevel}`);
+        }
         break;
       }
 
@@ -413,11 +670,12 @@ function evaluateDimensionScore(
         if (!group.acceptedValues.length) {
           score = 100;
           passed = true;
+          matchLevel = "exact";
         } else {
-          const country = normalise(candidate.country || "");
-          const match = group.acceptedValues.some((v) => valueMatchesAny(country, [v]) >= 0.5);
-          score = match ? 100 : 0;
-          passed = match;
+          const { ratio } = valueMatchesAny(candidate.country || "", group.acceptedValues);
+          score = ratio >= 0.5 ? 100 : 0;
+          matchLevel = ratio >= 0.5 ? "exact" : "unrelated";
+          passed = ratio >= 0.5;
         }
         break;
       }
@@ -425,10 +683,11 @@ function evaluateDimensionScore(
       default:
         score = 50;
         passed = true;
+        matchLevel = "related";
     }
 
     // Apply preferred multiplier
-    if (group.level === "preferred" && group.weightMultiplier) {
+    if (group.state === "preferred" && group.weightMultiplier) {
       score = Math.round(score * group.weightMultiplier);
     }
 
@@ -440,18 +699,15 @@ function evaluateDimensionScore(
       max,
       matched,
       required,
+      matchLevel,
+      evidence,
     });
 
     totalScore += score;
     totalMax += max;
   }
 
-  return {
-    score: totalScore,
-    max: totalMax,
-    groups: groupScores,
-    reasons,
-  };
+  return { score: totalScore, max: totalMax, groups: groupScores, reasons };
 }
 
 // ─── Main Scoring Engine ────────────────────────────────────────────
@@ -465,18 +721,17 @@ export function scoreApplicationV2(
     ...(model.weights || {}),
   };
 
-  // 0. Normalize candidate input using ISCO/O*NET/ESCO taxonomy
-  // This classifies raw answers into structured data the scoring engine understands
-  const normalizedOccupation = candidate.experienceEntries?.[0]?.title
-    ? normalizeOccupation(candidate.experienceEntries[0].title, model.targetOccupation)
-    : null;
+  // 1. Normalize candidate input
   const normalizedSkills = (candidate.skills || []).map(normalizeSkill);
+  const normalizedIndustry = candidate.industry
+    ? normalizeIndustry(candidate.industry)
+    : null;
 
-  // 1. Evaluate eligibility (required groups only)
+  // 2. Evaluate eligibility
   const eligibility = evaluateEligibility(model.requirementGroups, candidate);
 
-  // 2. Group requirement groups by dimension
-  const dimensionGroups: Record<string, RequirementGroup[]> = {
+  // 3. Group requirement groups by dimension
+  const dimensionGroups: { education: RequirementGroup[]; experience: RequirementGroup[]; skills: RequirementGroup[]; certifications: RequirementGroup[]; industry: RequirementGroup[]; location: RequirementGroup[] } = {
     education: [],
     experience: [],
     skills: [],
@@ -512,8 +767,9 @@ export function scoreApplicationV2(
     }
   }
 
-  // 3. Score each dimension
+  // 4. Score each dimension
   const allReasons: string[] = [];
+  const allEvidence: string[] = [];
   const breakdown: ScoreBreakdown[] = [];
 
   for (const [dimension, groups] of Object.entries(dimensionGroups)) {
@@ -521,12 +777,9 @@ export function scoreApplicationV2(
 
     const dimensionWeight = weights[dimension as keyof ScoringWeights] || 0;
     const { score, max, groups: groupScores, reasons } = evaluateDimensionScore(
-      groups,
-      candidate,
-      dimension,
+      groups, candidate, dimension, model,
     );
 
-    // Normalize to dimension weight
     const ratio = max > 0 ? score / max : 0;
     const weightedScore = Math.round(ratio * dimensionWeight);
 
@@ -539,15 +792,32 @@ export function scoreApplicationV2(
     });
 
     allReasons.push(...reasons);
+    for (const g of groupScores) {
+      allEvidence.push(...g.evidence);
+    }
   }
 
-  // 4. Calculate total
+  // 5. Calculate total
   const total = breakdown.reduce((sum, d) => sum + d.score, 0);
 
-  // 5. Recommendation
+  // 6. Calculate confidence
+  const hasData = Boolean(
+    candidate.highestQualification ||
+    (candidate.experienceEntries && candidate.experienceEntries.length > 0) ||
+    (candidate.skills && candidate.skills.length > 0),
+  );
+  const evidenceCount = allEvidence.length;
+  const hasUnknown = eligibility.status === "review";
+  const confidence = hasUnknown
+    ? "low"
+    : calculateConfidence(hasData, evidenceCount, Boolean(normalizedIndustry));
+
+  // 7. Recommendation
   let recommendation: string;
-  if (!eligibility.eligible) {
-    recommendation = "Ineligible";
+  if (eligibility.status === "fail") {
+    recommendation = "Ineligible — does not meet required criteria";
+  } else if (eligibility.status === "review") {
+    recommendation = "Requires review — some information could not be verified";
   } else if (total >= 90) {
     recommendation = "Excellent Match";
   } else if (total >= 80) {
@@ -564,18 +834,16 @@ export function scoreApplicationV2(
     total,
     breakdown,
     eligibility,
+    confidence,
     recommendation,
     reasons: allReasons,
-    scoreVersion: 2,
+    discrepancies: [],
+    scoreVersion: 3,
   };
 }
 
 // ─── Test Scoring Helper ────────────────────────────────────────────
 
-/**
- * Test the scoring model with hypothetical candidates.
- * Used by the recruiter to validate their scoring rules before publishing.
- */
 export function testScoringModel(
   model: CampaignScoringModel,
   testCandidates: CandidateScoringInput[],

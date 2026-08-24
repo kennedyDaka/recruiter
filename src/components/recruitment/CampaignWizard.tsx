@@ -101,7 +101,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Education Level",
         type: "education_level",
-        level: builder.qualificationLevel === "not_required" ? "preferred" : builder.qualificationLevel,
+        state: builder.qualificationLevel === "not_required" ? "preferred" : builder.qualificationLevel,
         acceptedValues: [builder.minQualification],
         minMatch: 1,
       }),
@@ -116,7 +116,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Field of Study",
         type: "education_field",
-        level: hasRequired ? "required" : "preferred",
+        state: hasRequired ? "required" : "preferred",
         acceptedValues: builder.fieldsOfStudy.map((f) => f.name),
         minMatch: hasRequired ? required.length : 1,
       }),
@@ -131,7 +131,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Experience Area",
         type: "experience_area",
-        level: hasRequired ? "required" : "preferred",
+        state: hasRequired ? "required" : "preferred",
         acceptedValues: builder.experienceAreas.map((a) => a.name),
         minMatch: 1,
         minYears: builder.minExperience || 0,
@@ -146,7 +146,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Required Skills",
         type: "skill_required",
-        level: "required",
+        state: "required",
         acceptedValues: requiredSkills.map((s) => s.name),
         minMatch: Math.max(1, Math.ceil(requiredSkills.length * 0.6)),
       }),
@@ -160,7 +160,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Preferred Skills",
         type: "skill_preferred",
-        level: "preferred",
+        state: "preferred",
         acceptedValues: preferredSkills.map((s) => s.name),
         minMatch: 1,
       }),
@@ -174,7 +174,7 @@ function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
       createRequirementGroup({
         name: "Certifications",
         type: "certification",
-        level: requiredCerts.some((c) => c.level === "required") ? "required" : "preferred",
+        state: requiredCerts.some((c) => c.level === "required") ? "required" : "preferred",
         acceptedValues: requiredCerts.map((c) => c.name),
         minMatch: 1,
       }),
@@ -2092,8 +2092,8 @@ export function CampaignWizard() {
                   <div className="mt-3 space-y-2">
                     {autoGroups.map((group) => (
                       <div key={group.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-                        <Badge variant={group.level === "required" ? "default" : "secondary"}>
-                          {group.level}
+                        <Badge variant={group.state === "required" ? "default" : "secondary"}>
+                          {group.state}
                         </Badge>
                         <span className="flex-1 text-sm font-medium">{group.name}</span>
                         <span className="text-xs text-muted-foreground">

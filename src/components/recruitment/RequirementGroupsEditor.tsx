@@ -159,10 +159,10 @@ export function RequirementGroupsEditor({ groups, onChange }: Props) {
     const newGroup = createRequirementGroup({
       name: config.label,
       type,
-      level: "required",
+      state: "required",
       acceptedValues: [],
       minMatch: type === "skill_required" ? 3 : 1,
-      minYears: type === "experience_area" ? 3 : undefined,
+      ...(type === "experience_area" ? { minYears: 3 } : {}),
     });
     onChange([...groups, newGroup]);
     setExpandedId(newGroup.id);
@@ -270,8 +270,8 @@ export function RequirementGroupsEditor({ groups, onChange }: Props) {
                   <Icon className="size-4" />
                   <span className="flex-1 text-sm font-medium">{group.name}</span>
                   <Badge className={config.color}>{config.label}</Badge>
-                  <Badge variant={group.level === "required" ? "default" : "secondary"}>
-                    {group.level}
+                  <Badge variant={group.state === "required" ? "default" : "secondary"}>
+                    {group.state}
                   </Badge>
                   {isExpanded ? (
                     <ChevronUp className="size-4 text-muted-foreground" />
@@ -298,18 +298,20 @@ export function RequirementGroupsEditor({ groups, onChange }: Props) {
                       <div className="space-y-1">
                         <Label>Requirement Level</Label>
                         <p className="text-xs text-muted-foreground">
-                          {group.level === "required"
+                          {group.state === "required"
                             ? "Failing this group makes the candidate ineligible"
-                            : "Failing this group reduces the score but candidate stays eligible"}
+                            : group.state === "preferred"
+                            ? "Failing this group reduces the score but candidate stays eligible"
+                            : "Collected for reference — does not affect eligibility or score"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="text-sm">Preferred</span>
                         <Switch
-                          checked={group.level === "required"}
+                          checked={group.state === "required"}
                           onCheckedChange={(checked) =>
                             updateGroup(group.id, {
-                              level: checked ? "required" : "preferred",
+                              state: checked ? "required" : "preferred",
                             })
                           }
                         />
@@ -454,11 +456,11 @@ export function RequirementGroupsEditor({ groups, onChange }: Props) {
           <h4 className="text-sm font-medium">Summary</h4>
           <div className="mt-2 space-y-1 text-sm text-muted-foreground">
             <p>
-              {groups.filter((g) => g.level === "required").length} required groups
+              {groups.filter((g) => g.state === "required").length} required groups
               (blocks eligibility if failed)
             </p>
             <p>
-              {groups.filter((g) => g.level === "preferred").length} preferred groups
+              {groups.filter((g) => g.state === "preferred").length} preferred groups
               (score bonus if passed)
             </p>
             <p>

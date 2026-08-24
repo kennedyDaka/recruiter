@@ -28,11 +28,12 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Beaker, Plus, X, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { scoreApplicationV2, type ScoringResult } from "@/lib/ors-scoring-v2";
+import { scoreApplicationV2 } from "@/lib/ors-scoring-v2";
 import type {
   CampaignScoringModel,
   CandidateScoringInput,
   RequirementGroup,
+  ScoringResult,
 } from "@/lib/ors-requirements";
 
 type Props = {

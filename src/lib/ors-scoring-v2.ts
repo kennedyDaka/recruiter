@@ -703,8 +703,14 @@ function evaluateDimensionScore(
       evidence,
     });
 
-    totalScore += score;
-    totalMax += max;
+    // Preferred groups add bonus points only — they NEVER reduce the score.
+    // Required groups contribute to both numerator and denominator.
+    if (group.state === "preferred") {
+      totalScore += score; // Bonus added on top
+    } else {
+      totalScore += score;
+      totalMax += max;
+    }
   }
 
   return { score: totalScore, max: totalMax, groups: groupScores, reasons };
@@ -780,7 +786,9 @@ export function scoreApplicationV2(
       groups, candidate, dimension, model,
     );
 
-    const ratio = max > 0 ? score / max : 0;
+    // When all groups are preferred (max=0), the score IS the bonus —
+    // treat it as a percentage of the dimension weight directly.
+    const ratio = max > 0 ? Math.min(1, score / max) : Math.min(1, score / 100);
     const weightedScore = Math.round(ratio * dimensionWeight);
 
     breakdown.push({

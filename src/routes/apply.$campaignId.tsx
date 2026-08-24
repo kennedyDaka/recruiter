@@ -162,14 +162,10 @@ type ApplicationDraft = {
 };
 
 type ApplicationStep =
-  | "contact"
-  | "profile"
-  | "education"
-  | "experience"
-  | "skills"
-  | "certifications"
+  | "contact"        // Contact + Profile + Skills
+  | "education"      // Education + Certifications
+  | "experience"     // Experience + References
   | "documents"
-  | "references"
   | "screening"
   | "review";
 
@@ -881,16 +877,12 @@ function ApplyPage() {
   const applicationSteps = useMemo(
     () =>
       [
-        { id: "contact" as const, label: "Contact" },
-        { id: "profile" as const, label: "Profile" },
-        { id: "education" as const, label: "Education" },
-        { id: "experience" as const, label: "Experience" },
-        { id: "skills" as const, label: "Skills" },
-        { id: "certifications" as const, label: "Certifications" },
+        { id: "contact" as const, label: "Contact & Profile" },
+        { id: "education" as const, label: "Education & Certs" },
+        { id: "experience" as const, label: "Experience & References" },
         ...(campaign?.required_documents?.length
           ? [{ id: "documents" as const, label: "Documents" }]
           : []),
-        { id: "references" as const, label: "References" },
         ...(questions?.length ? [{ id: "screening" as const, label: "Screening" }] : []),
         { id: "review" as const, label: "Review" },
       ] satisfies { id: ApplicationStep; label: string }[],
@@ -1039,6 +1031,7 @@ function ApplyPage() {
 
   const continueApplication = () => {
     if (currentStep === "contact") {
+      // Combined: Contact + Profile + Skills
       if (
         !form.first_name.trim() ||
         !form.last_name.trim() ||
@@ -1053,14 +1046,18 @@ function ApplyPage() {
         toast.error("Enter a valid email address to continue.");
         return;
       }
-    }
-
-    if (currentStep === "profile" && form.professional_summary.trim().length < 40) {
-      toast.error("Add a short professional summary of at least 40 characters.");
-      return;
+      if (form.professional_summary.trim().length < 40) {
+        toast.error("Add a short professional summary of at least 40 characters.");
+        return;
+      }
+      if (skills.length === 0) {
+        toast.error("Add at least one skill to continue.");
+        return;
+      }
     }
 
     if (currentStep === "education") {
+      // Combined: Education + Certifications
       const incomplete = education.some(
         (entry) =>
           !entry.qualification || !entry.institution.trim() || !entry.field_of_study.trim(),
@@ -1071,9 +1068,18 @@ function ApplyPage() {
         );
         return;
       }
+      const requiredCerts = campaign?.required_certifications ?? [];
+      const missingCerts = requiredCerts.filter(
+        (cert) => !certifications.some((held) => held.toLowerCase() === cert.toLowerCase()),
+      );
+      if (missingCerts.length) {
+        toast.error(`Add the required certification${missingCerts.length === 1 ? "" : "s"}: ${missingCerts.join(", ")}.`);
+        return;
+      }
     }
 
     if (currentStep === "experience") {
+      // Combined: Experience + References
       const incomplete = experience.some(
         (entry) =>
           Boolean(entry.employer || entry.position || entry.start_date || entry.end_date) &&
@@ -1088,51 +1094,14 @@ function ApplyPage() {
         );
         return;
       }
-    }
-
-    if (currentStep === "skills" && skills.length === 0) {
-      toast.error("Add at least one skill to continue.");
-      return;
-    }
-
-    if (currentStep === "certifications") {
-      const required = campaign?.required_certifications ?? [];
-      const missing = required.filter(
-        (cert) => !certifications.some((held) => held.toLowerCase() === cert.toLowerCase()),
-      );
-      if (missing.length) {
-        toast.error(`Add the required certification${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`);
-        return;
-      }
-    }
-
-    if (currentStep === "documents") {
-      const missing = (campaign?.required_documents ?? []).filter((doc) => !uploadedFiles[doc]);
-      if (missing.length) {
-        toast.error(`Upload ${missing.join(", ")} to continue.`);
-        return;
-      }
-    }
-
-    if (currentStep === "references") {
-      const required = campaign?.referee_count ?? 2;
-      const valid = referees.filter(
+      const refRequired = campaign?.referee_count ?? 2;
+      const refValid = referees.filter(
         (referee) => referee.name.trim() && (referee.email.trim() || referee.phone.trim()),
       );
-      if (valid.length < required) {
+      if (refValid.length < refRequired) {
         toast.error(
-          `Add ${required} reference${required === 1 ? "" : "s"} with a name and contact detail.`,
+          `Add ${refRequired} reference${refRequired === 1 ? "" : "s"} with a name and contact detail.`,
         );
-        return;
-      }
-    }
-
-    if (currentStep === "screening") {
-      const missingAnswer = questions?.find(
-        (question) => question.is_mandatory && isBlankAnswer(answers[question.id]),
-      );
-      if (missingAnswer) {
-        toast.error("Answer every required screening question to continue.");
         return;
       }
     }
@@ -1367,144 +1336,231 @@ function ApplyPage() {
               <ApplicationProgress steps={applicationSteps} activeStep={wizardStep} />
 
               {currentStep === "contact" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                  <SectionHeading
-                    icon={CircleUserRound}
-                    title="Contact details"
-                    subtitle="Use the details where the recruiter can reach you."
-                  />
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <Field label="First name" htmlFor="first_name">
-                      <Input
-                        id="first_name"
-                        required
-                        maxLength={80}
-                        value={form.first_name}
-                        onChange={(event) => set("first_name")(event.target.value)}
-                      />
-                    </Field>
-                    <Field label="Last name" htmlFor="last_name">
-                      <Input
-                        id="last_name"
-                        required
-                        maxLength={80}
-                        value={form.last_name}
-                        onChange={(event) => set("last_name")(event.target.value)}
-                      />
-                    </Field>
-                    <Field label="Email" htmlFor="email">
-                      <Input
-                        id="email"
-                        type="email"
-                        required
-                        maxLength={255}
-                        value={form.email}
-                        onChange={(event) => set("email")(event.target.value)}
-                      />
-                    </Field>
-                    <Field label="Phone" htmlFor="phone">
-                      <Input
-                        id="phone"
-                        inputMode="tel"
-                        maxLength={40}
-                        value={form.phone}
-                        onChange={(event) => set("phone")(event.target.value)}
-                      />
-                    </Field>
-                    <Field label="Country" htmlFor="country">
-                      <Select
-                        value={form.country}
-                        onValueChange={(value) =>
-                          setForm((previous) => ({ ...previous, country: value, city: "" }))
-                        }
-                      >
-                        <SelectTrigger id="country">
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {APPLICANT_COUNTRIES.map((country) => (
-                            <SelectItem key={country} value={country}>
-                              {country}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="City" htmlFor="city">
-                      <Input
-                        id="city"
-                        list="city-suggestions"
-                        maxLength={120}
-                        placeholder={
-                          form.country ? "Select or type your city" : "Select a country first"
-                        }
-                        value={form.city}
-                        onChange={(event) => set("city")(event.target.value)}
-                      />
-                      <datalist id="city-suggestions">
-                        {citySuggestions.map((city) => (
-                          <option key={city} value={city} />
-                        ))}
-                      </datalist>
-                    </Field>
-                    <Field label="Area or suburb" htmlFor="location" className="sm:col-span-2">
-                      <Input
-                        id="location"
-                        maxLength={160}
-                        placeholder="Optional"
-                        value={form.location}
-                        onChange={(event) => set("location")(event.target.value)}
-                      />
-                    </Field>
-                  </div>
-                </section>
-              ) : null}
-
-              {currentStep === "profile" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                  <SectionHeading
-                    icon={CircleUserRound}
-                    title="Professional profile"
-                    subtitle="A concise summary makes your experience easier to assess."
-                  />
-                  <div className="mt-5 space-y-4">
-                    <Field label="Professional summary" htmlFor="professional_summary">
-                      <Textarea
-                        id="professional_summary"
-                        rows={6}
-                        maxLength={3000}
-                        placeholder="Summarise your career focus, strongest experience, and the value you bring."
-                        value={form.professional_summary}
-                        onChange={(event) => set("professional_summary")(event.target.value)}
-                      />
-                    </Field>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="LinkedIn profile" htmlFor="linkedin_url">
+                <>
+                  {/* ── Contact details ── */}
+                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                    <SectionHeading
+                      icon={CircleUserRound}
+                      title="Contact details"
+                      subtitle="Use the details where the recruiter can reach you."
+                    />
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <Field label="First name" htmlFor="first_name">
                         <Input
-                          id="linkedin_url"
-                          type="url"
-                          maxLength={500}
-                          placeholder="https://linkedin.com/in/..."
-                          value={form.linkedin_url}
-                          onChange={(event) => set("linkedin_url")(event.target.value)}
+                          id="first_name"
+                          required
+                          maxLength={80}
+                          value={form.first_name}
+                          onChange={(event) => set("first_name")(event.target.value)}
                         />
                       </Field>
-                      <Field label="Portfolio or professional website" htmlFor="portfolio_url">
+                      <Field label="Last name" htmlFor="last_name">
                         <Input
-                          id="portfolio_url"
-                          type="url"
-                          maxLength={500}
-                          placeholder="https://..."
-                          value={form.portfolio_url}
-                          onChange={(event) => set("portfolio_url")(event.target.value)}
+                          id="last_name"
+                          required
+                          maxLength={80}
+                          value={form.last_name}
+                          onChange={(event) => set("last_name")(event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Email" htmlFor="email">
+                        <Input
+                          id="email"
+                          type="email"
+                          required
+                          maxLength={255}
+                          value={form.email}
+                          onChange={(event) => set("email")(event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Phone" htmlFor="phone">
+                        <Input
+                          id="phone"
+                          inputMode="tel"
+                          maxLength={40}
+                          value={form.phone}
+                          onChange={(event) => set("phone")(event.target.value)}
+                        />
+                      </Field>
+                      <Field label="Country" htmlFor="country">
+                        <Select
+                          value={form.country}
+                          onValueChange={(value) =>
+                            setForm((previous) => ({ ...previous, country: value, city: "" }))
+                          }
+                        >
+                          <SelectTrigger id="country">
+                            <SelectValue placeholder="Select country" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {APPLICANT_COUNTRIES.map((country) => (
+                              <SelectItem key={country} value={country}>
+                                {country}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="City" htmlFor="city">
+                        <Input
+                          id="city"
+                          list="city-suggestions"
+                          maxLength={120}
+                          placeholder={
+                            form.country ? "Select or type your city" : "Select a country first"
+                          }
+                          value={form.city}
+                          onChange={(event) => set("city")(event.target.value)}
+                        />
+                        <datalist id="city-suggestions">
+                          {citySuggestions.map((city) => (
+                            <option key={city} value={city} />
+                          ))}
+                        </datalist>
+                      </Field>
+                      <Field label="Area or suburb" htmlFor="location" className="sm:col-span-2">
+                        <Input
+                          id="location"
+                          maxLength={160}
+                          placeholder="Optional"
+                          value={form.location}
+                          onChange={(event) => set("location")(event.target.value)}
                         />
                       </Field>
                     </div>
-                  </div>
-                </section>
+                  </section>
+
+                  {/* ── Professional profile ── */}
+                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                    <SectionHeading
+                      icon={CircleUserRound}
+                      title="Professional profile"
+                      subtitle="A concise summary makes your experience easier to assess."
+                    />
+                    <div className="mt-5 space-y-4">
+                      <Field label="Professional summary" htmlFor="professional_summary">
+                        <Textarea
+                          id="professional_summary"
+                          rows={6}
+                          maxLength={3000}
+                          placeholder="Summarise your career focus, strongest experience, and the value you bring."
+                          value={form.professional_summary}
+                          onChange={(event) => set("professional_summary")(event.target.value)}
+                        />
+                      </Field>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="LinkedIn profile" htmlFor="linkedin_url">
+                          <Input
+                            id="linkedin_url"
+                            type="url"
+                            maxLength={500}
+                            placeholder="https://linkedin.com/in/..."
+                            value={form.linkedin_url}
+                            onChange={(event) => set("linkedin_url")(event.target.value)}
+                          />
+                        </Field>
+                        <Field label="Portfolio or professional website" htmlFor="portfolio_url">
+                          <Input
+                            id="portfolio_url"
+                            type="url"
+                            maxLength={500}
+                            placeholder="https://..."
+                            value={form.portfolio_url}
+                            onChange={(event) => set("portfolio_url")(event.target.value)}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* ── Skills ── */}
+                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                    <SectionHeading
+                      icon={Wrench}
+                      title="Skills"
+                      subtitle="Choose skills from the role and catalog so they can be matched consistently."
+                    />
+                    {(campaign?.required_skills?.length ?? 0) > 0 ? (
+                      <div className="mt-5">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Role-required skills
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {campaign?.required_skills?.map((skill) => (
+                            <Button
+                              key={skill}
+                              type="button"
+                              size="sm"
+                              variant={
+                                skills.some(
+                                  (selected) => selected.toLowerCase() === skill.toLowerCase(),
+                                )
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                              onClick={() => addSkill(skill)}
+                            >
+                              {skills.some(
+                                (selected) => selected.toLowerCase() === skill.toLowerCase(),
+                              ) ? (
+                                <CheckCircle2 className="mr-1.5 size-3.5" />
+                              ) : (
+                                <Plus className="mr-1.5 size-3.5" />
+                              )}
+                              {skill}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="mt-5 flex gap-2">
+                      <Input
+                        list="skill-suggestions"
+                        maxLength={80}
+                        placeholder="Select or type a skill"
+                        value={skillInput}
+                        onChange={(event) => setSkillInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addSkill();
+                          }
+                        }}
+                      />
+                      <IconButton label="Add skill" onClick={() => addSkill()}>
+                        <Plus className="size-4" />
+                      </IconButton>
+                    </div>
+                    <datalist id="skill-suggestions">
+                      {skillSuggestions.map((skill) => (
+                        <option key={skill} value={skill} />
+                      ))}
+                    </datalist>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/50 py-1 pl-2 pr-1 text-sm"
+                        >
+                          {skill}
+                          <IconButton
+                            label={`Remove ${skill}`}
+                            className="size-6"
+                            onClick={() =>
+                              setSkills((current) => current.filter((item) => item !== skill))
+                            }
+                          >
+                            <Trash2 className="size-3.5" />
+                          </IconButton>
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                </>
               ) : null}
 
               {currentStep === "education" ? (
+                <>
                 <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <SectionHeading
                     icon={GraduationCap}
@@ -1636,9 +1692,127 @@ function ApplyPage() {
                     Add another qualification
                   </Button>
                 </section>
+
+                {/* ── Certifications ── */}
+                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <SectionHeading
+                    icon={Award}
+                    title="Certifications"
+                    subtitle="Add professional certifications you hold, so they can be matched to the role's requirements."
+                  />
+                  {(campaign?.required_certifications?.length ?? 0) > 0 ? (
+                    <div className="mt-5">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Required for this role
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {campaign?.required_certifications?.map((cert) => (
+                          <Button
+                            key={cert}
+                            type="button"
+                            size="sm"
+                            variant={
+                              certifications.some(
+                                (held) => held.toLowerCase() === cert.toLowerCase(),
+                              )
+                                ? "secondary"
+                                : "outline"
+                            }
+                            onClick={() => addCertification(cert)}
+                          >
+                            {certifications.some(
+                              (held) => held.toLowerCase() === cert.toLowerCase(),
+                            ) ? (
+                              <CheckCircle2 className="mr-1.5 size-3.5" />
+                            ) : (
+                              <Plus className="mr-1.5 size-3.5" />
+                            )}
+                            {cert}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="relative mt-5">
+                    <div className="flex gap-2">
+                      <Input
+                        maxLength={120}
+                        placeholder="Search the certification catalog or type a name"
+                        value={certificationInput}
+                        onChange={(event) => setCertificationInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addCertification();
+                          }
+                        }}
+                        onBlur={() =>
+                          setTimeout(() => setCertificationOpen(false), 150)
+                        }
+                      />
+                      <IconButton label="Add certification" onClick={() => addCertification()}>
+                        <Plus className="size-4" />
+                      </IconButton>
+                    </div>
+                    {certificationOpen ? (
+                      <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg">
+                        {certificationHits.length ? (
+                          <ul className="max-h-56 overflow-auto py-1">
+                            {certificationHits.map((entry) => (
+                              <li key={entry.id}>
+                                <button
+                                  type="button"
+                                  className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-accent"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setCertificationInput(entry.name);
+                                    setCertificationOpen(false);
+                                    addCertification(entry.name);
+                                  }}
+                                >
+                                  <span className="font-medium">{entry.name}</span>
+                                  {entry.full_name ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {entry.full_name}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="px-3 py-2 text-sm text-muted-foreground">
+                            No certifications found — you can still type the name.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {certifications.map((cert) => (
+                      <span
+                        key={cert}
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/50 py-1 pl-2 pr-1 text-sm"
+                      >
+                        {cert}
+                        <IconButton
+                          label={`Remove ${cert}`}
+                          className="size-6"
+                          onClick={() =>
+                            setCertifications((current) => current.filter((item) => item !== cert))
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                        </IconButton>
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              </>
               ) : null}
 
               {currentStep === "experience" ? (
+                <>
                 <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <SectionHeading
                     icon={BriefcaseBusiness}
@@ -1792,284 +1966,8 @@ function ApplyPage() {
                     Add another experience
                   </Button>
                 </section>
-              ) : null}
 
-              {currentStep === "skills" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                  <SectionHeading
-                    icon={Wrench}
-                    title="Skills"
-                    subtitle="Choose skills from the role and catalog so they can be matched consistently."
-                  />
-                  {(campaign?.required_skills?.length ?? 0) > 0 ? (
-                    <div className="mt-5">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Role-required skills
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {campaign?.required_skills?.map((skill) => (
-                          <Button
-                            key={skill}
-                            type="button"
-                            size="sm"
-                            variant={
-                              skills.some(
-                                (selected) => selected.toLowerCase() === skill.toLowerCase(),
-                              )
-                                ? "secondary"
-                                : "outline"
-                            }
-                            onClick={() => addSkill(skill)}
-                          >
-                            {skills.some(
-                              (selected) => selected.toLowerCase() === skill.toLowerCase(),
-                            ) ? (
-                              <CheckCircle2 className="mr-1.5 size-3.5" />
-                            ) : (
-                              <Plus className="mr-1.5 size-3.5" />
-                            )}
-                            {skill}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="mt-5 flex gap-2">
-                    <Input
-                      list="skill-suggestions"
-                      maxLength={80}
-                      placeholder="Select or type a skill"
-                      value={skillInput}
-                      onChange={(event) => setSkillInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addSkill();
-                        }
-                      }}
-                    />
-                    <IconButton label="Add skill" onClick={() => addSkill()}>
-                      <Plus className="size-4" />
-                    </IconButton>
-                  </div>
-                  <datalist id="skill-suggestions">
-                    {skillSuggestions.map((skill) => (
-                      <option key={skill} value={skill} />
-                    ))}
-                  </datalist>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {skills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/50 py-1 pl-2 pr-1 text-sm"
-                      >
-                        {skill}
-                        <IconButton
-                          label={`Remove ${skill}`}
-                          className="size-6"
-                          onClick={() =>
-                            setSkills((current) => current.filter((item) => item !== skill))
-                          }
-                        >
-                          <Trash2 className="size-3.5" />
-                        </IconButton>
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              {currentStep === "certifications" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                  <SectionHeading
-                    icon={Award}
-                    title="Certifications"
-                    subtitle="Add professional certifications you hold, so they can be matched to the role's requirements."
-                  />
-                  {(campaign?.required_certifications?.length ?? 0) > 0 ? (
-                    <div className="mt-5">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Required for this role
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {campaign?.required_certifications?.map((cert) => (
-                          <Button
-                            key={cert}
-                            type="button"
-                            size="sm"
-                            variant={
-                              certifications.some(
-                                (held) => held.toLowerCase() === cert.toLowerCase(),
-                              )
-                                ? "secondary"
-                                : "outline"
-                            }
-                            onClick={() => addCertification(cert)}
-                          >
-                            {certifications.some(
-                              (held) => held.toLowerCase() === cert.toLowerCase(),
-                            ) ? (
-                              <CheckCircle2 className="mr-1.5 size-3.5" />
-                            ) : (
-                              <Plus className="mr-1.5 size-3.5" />
-                            )}
-                            {cert}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="relative mt-5">
-                    <div className="flex gap-2">
-                      <Input
-                        maxLength={120}
-                        placeholder="Search the certification catalog or type a name"
-                        value={certificationInput}
-                        onChange={(event) => setCertificationInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            addCertification();
-                          }
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => setCertificationOpen(false), 150)
-                        }
-                      />
-                      <IconButton label="Add certification" onClick={() => addCertification()}>
-                        <Plus className="size-4" />
-                      </IconButton>
-                    </div>
-                    {certificationOpen ? (
-                      <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg">
-                        {certificationHits.length ? (
-                          <ul className="max-h-56 overflow-auto py-1">
-                            {certificationHits.map((entry) => (
-                              <li key={entry.id}>
-                                <button
-                                  type="button"
-                                  className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-accent"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    setCertificationInput(entry.name);
-                                    setCertificationOpen(false);
-                                    addCertification(entry.name);
-                                  }}
-                                >
-                                  <span className="font-medium">{entry.name}</span>
-                                  {entry.full_name ? (
-                                    <span className="text-xs text-muted-foreground">
-                                      {entry.full_name}
-                                    </span>
-                                  ) : null}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="px-3 py-2 text-sm text-muted-foreground">
-                            No certifications found — you can still type the name.
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {certifications.map((cert) => (
-                      <span
-                        key={cert}
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/50 py-1 pl-2 pr-1 text-sm"
-                      >
-                        {cert}
-                        <IconButton
-                          label={`Remove ${cert}`}
-                          className="size-6"
-                          onClick={() =>
-                            setCertifications((current) => current.filter((item) => item !== cert))
-                          }
-                        >
-                          <Trash2 className="size-3.5" />
-                        </IconButton>
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              {currentStep === "documents" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                  <SectionHeading
-                    icon={FileText}
-                    title="Documents"
-                    subtitle="Upload the documents requested for this vacancy — PDF, DOC, DOCX, images or text, up to 10 MB each."
-                  />
-                  <div className="mt-5 space-y-4">
-                    {(campaign?.required_documents ?? []).map((docType) => {
-                      const file = uploadedFiles[docType];
-                      const restored = restoredDocuments[docType];
-                      return (
-                        <div key={docType} className="rounded-lg border border-border/80 p-4">
-                          <div className="flex items-center justify-between gap-4">
-                            <p className="text-sm font-medium">{docType}</p>
-                            {file ? (
-                              <IconButton
-                                label={`Remove ${docType}`}
-                                onClick={() => {
-                                  setUploadedFiles((current) => {
-                                    const next = { ...current };
-                                    delete next[docType];
-                                    return next;
-                                  });
-                                }}
-                              >
-                                <Trash2 className="size-4" />
-                              </IconButton>
-                            ) : null}
-                          </div>
-                          {file ? (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              {file.name} · {(file.size / 1024).toFixed(0)} KB
-                            </p>
-                          ) : restored ? (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              Previously selected: {restored.name} — select the file again to
-                              include it.
-                            </p>
-                          ) : (
-                            <p className="mt-2 text-sm text-muted-foreground">No file selected.</p>
-                          )}
-                          <Label htmlFor={`document-${docType}`} className="sr-only">
-                            Upload {docType}
-                          </Label>
-                          <Input
-                            id={`document-${docType}`}
-                            type="file"
-                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.rtf"
-                            className="mt-3"
-                            onChange={(event) => {
-                              const selected = event.target.files?.[0];
-                              if (!selected) return;
-                              if (selected.size > 10 * 1024 * 1024) {
-                                toast.error(`${docType} must be 10 MB or smaller.`);
-                                event.target.value = "";
-                                return;
-                              }
-                              setUploadedFiles((current) => ({ ...current, [docType]: selected }));
-                              setRestoredDocuments((current) => {
-                                const next = { ...current };
-                                delete next[docType];
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ) : null}
-
-              {currentStep === "references" ? (
+                {/* ── Professional references ── */}
                 <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <SectionHeading
                     icon={UserRoundCheck}
@@ -2172,7 +2070,85 @@ function ApplyPage() {
                     Add another reference
                   </Button>
                 </section>
+              </>
               ) : null}
+
+
+
+
+              {currentStep === "documents" ? (
+                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <SectionHeading
+                    icon={FileText}
+                    title="Documents"
+                    subtitle="Upload the documents requested for this vacancy — PDF, DOC, DOCX, images or text, up to 10 MB each."
+                  />
+                  <div className="mt-5 space-y-4">
+                    {(campaign?.required_documents ?? []).map((docType) => {
+                      const file = uploadedFiles[docType];
+                      const restored = restoredDocuments[docType];
+                      return (
+                        <div key={docType} className="rounded-lg border border-border/80 p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-sm font-medium">{docType}</p>
+                            {file ? (
+                              <IconButton
+                                label={`Remove ${docType}`}
+                                onClick={() => {
+                                  setUploadedFiles((current) => {
+                                    const next = { ...current };
+                                    delete next[docType];
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <Trash2 className="size-4" />
+                              </IconButton>
+                            ) : null}
+                          </div>
+                          {file ? (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              {file.name} · {(file.size / 1024).toFixed(0)} KB
+                            </p>
+                          ) : restored ? (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              Previously selected: {restored.name} — select the file again to
+                              include it.
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-sm text-muted-foreground">No file selected.</p>
+                          )}
+                          <Label htmlFor={`document-${docType}`} className="sr-only">
+                            Upload {docType}
+                          </Label>
+                          <Input
+                            id={`document-${docType}`}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.rtf"
+                            className="mt-3"
+                            onChange={(event) => {
+                              const selected = event.target.files?.[0];
+                              if (!selected) return;
+                              if (selected.size > 10 * 1024 * 1024) {
+                                toast.error(`${docType} must be 10 MB or smaller.`);
+                                event.target.value = "";
+                                return;
+                              }
+                              setUploadedFiles((current) => ({ ...current, [docType]: selected }));
+                              setRestoredDocuments((current) => {
+                                const next = { ...current };
+                                delete next[docType];
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
 
               {currentStep === "screening" && questions?.length ? (
                 <section className="rounded-lg border border-border bg-card p-6 shadow-sm">

@@ -38,6 +38,7 @@ type PipelineApplication = {
   stage_id: string | null;
   score: number;
   recommendation: string | null;
+  eligibility_status: string | null;
   years_experience: number;
   highest_qualification: string | null;
   submitted_at: string | null;
@@ -104,7 +105,7 @@ function KanbanPage() {
         supabase
           .from("applications")
           .select(
-            "id, tenant_id, reference, stage_id, score, recommendation, years_experience, highest_qualification, submitted_at, candidates(first_name, last_name, email, phone, location)",
+            "id, tenant_id, reference, stage_id, score, recommendation, eligibility_status, years_experience, highest_qualification, submitted_at, candidates(first_name, last_name, email, phone, location)",
           )
           .eq("campaign_id", campaignId)
           .order("score", { ascending: false }),
@@ -337,8 +338,16 @@ function CandidateCard({
         <Badge variant="secondary">{application.recommendation ?? "Unscored"}</Badge>
         <span className="font-display text-xl font-semibold">{application.score}</span>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {application.highest_qualification ?? "Qualification not recorded"} ·{" "}
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Badge
+          variant={application.eligibility_status === "eligible" ? "default" : "destructive"}
+          className="text-[10px]"
+        >
+          {application.eligibility_status === "eligible" ? "Eligible" : application.eligibility_status === "not_eligible" ? "Not eligible" : "—"}
+        </Badge>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {application.highest_qualification ?? "No qualification"} ·{" "}
         {application.years_experience} yrs
       </p>
       {application.candidates?.location ? (

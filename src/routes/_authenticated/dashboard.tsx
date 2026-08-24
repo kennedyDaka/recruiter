@@ -131,9 +131,11 @@ function Dashboard() {
           <h2 className="font-display text-base font-semibold">Top scoring applications</h2>
           <div className="mt-4 space-y-3">
             {applications.map((application: any) => (
-              <div
+              <Link
                 key={application.id}
-                className="flex items-center justify-between rounded-lg border border-border/70 px-4 py-3 text-sm"
+                to="/applications/$applicationId"
+                params={{ applicationId: application.id }}
+                className="flex items-center justify-between rounded-lg border border-border/70 px-4 py-3 text-sm transition-colors hover:bg-accent"
               >
                 <span>
                   <span className="font-medium">{application.reference}</span>
@@ -142,7 +144,7 @@ function Dashboard() {
                   </span>
                 </span>
                 <span className="font-display text-lg font-semibold">{application.score}</span>
-              </div>
+              </Link>
             ))}
             {applications.length === 0 && !isLoading ? (
               <p className="text-sm text-muted-foreground">No applications received yet.</p>

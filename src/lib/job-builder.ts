@@ -7,11 +7,15 @@
  */
 
 export type RequirementLevel = "required" | "preferred" | "not_required";
+/** "related" means the field is acceptable but not ideal — still counts toward eligibility. */
+export type FieldLevel = RequirementLevel | "related";
 
 export type SkillRequirement = { name: string; category: string; level: RequirementLevel };
 export type SoftwareRequirement = { name: string; proficiency: Proficiency };
 export type CertificationRequirement = { name: string; level: RequirementLevel };
 export type LanguageRequirement = { name: string; level: LanguageLevel };
+export type FieldOfStudyRequirement = { name: string; level: FieldLevel };
+export type ExperienceAreaRequirement = { name: string; level: FieldLevel };
 
 export type Proficiency = "Basic" | "Intermediate" | "Advanced" | "Expert";
 export type LanguageLevel = "Basic" | "Conversational" | "Professional" | "Fluent";
@@ -89,13 +93,13 @@ export type JobBuilder = {
 
   minExperience: number;
   maxExperience: number | null;
-  experienceAreas: string[];
+  experienceAreas: ExperienceAreaRequirement[];
   experienceLevel: string;
   /** Recency window in years — null (default) disables the recency penalty. */
   experienceRecencyYears: number | null;
 
   minQualification: string;
-  fieldsOfStudy: string[];
+  fieldsOfStudy: FieldOfStudyRequirement[];
   qualificationLevel: RequirementLevel;
 
   certifications: CertificationRequirement[];
@@ -1050,16 +1054,18 @@ export function generateJobDescription(builder: JobBuilder): string {
 
   lines.push("", "Minimum Requirements");
   if (builder.minQualification) {
-    const fields = builder.fieldsOfStudy.length
-      ? ` in ${listSentence(builder.fieldsOfStudy)} or a related field`
+    const fieldNames = builder.fieldsOfStudy.map((f) => typeof f === 'string' ? f : f.name);
+    const fields = fieldNames.length
+      ? ` in ${listSentence(fieldNames)} or a related field`
       : "";
     lines.push(
       `• ${builder.minQualification}${fields} is ${builder.qualificationLevel === "required" ? "required" : "preferred"}.`,
     );
   }
   if (builder.minExperience > 0 || builder.experienceAreas.length) {
-    const areas = builder.experienceAreas.length
-      ? ` in ${listSentence(builder.experienceAreas)}`
+    const areaNames = builder.experienceAreas.map((a) => typeof a === 'string' ? a : a.name);
+    const areas = areaNames.length
+      ? ` in ${listSentence(areaNames)}`
       : "";
     lines.push(`• Minimum of ${builder.minExperience} year(s) relevant experience${areas}.`);
   }
@@ -1182,10 +1188,11 @@ export function generateQuestions(builder: JobBuilder): BuilderQuestion[] {
   const questions: BuilderQuestion[] = [];
 
   for (const area of builder.experienceAreas.slice(0, 4)) {
+    const areaName = typeof area === 'string' ? area : area.name;
     questions.push({
-      key: `q_area_${slugKey(area)}`,
+      key: `q_area_${slugKey(areaName)}`,
       category: "experience",
-      text: `How would you describe your experience in ${area}?`,
+      text: `How would you describe your experience in ${areaName}?`,
       type: "single_choice",
       options: RESPONSIBILITY_LEVEL_OPTIONS,
       mandatory: false,

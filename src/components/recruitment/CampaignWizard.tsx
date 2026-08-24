@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Beaker } from "lucide-react";
-import { RequirementGroupsEditor } from "@/components/recruitment/RequirementGroupsEditor";
+import { createRequirementGroup } from "@/lib/ors-requirements";
+import type { RequirementGroup } from "@/lib/ors-requirements";
 import { TestScoringDialog } from "@/components/recruitment/TestScoringDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -85,6 +86,103 @@ const STEPS = [
   "Scoring",
   "Publish",
 ];
+
+/**
+ * Auto-generate requirementGroups from the inline Step 2 data.
+ * Each field of study, experience area, skill, and certification becomes
+ * a requirement group with the level the recruiter set.
+ */
+function generateRequirementGroups(builder: JobBuilder): RequirementGroup[] {
+  const groups: RequirementGroup[] = [];
+
+  // Education level group
+  if (builder.minQualification) {
+    groups.push(
+      createRequirementGroup({
+        name: "Education Level",
+        type: "education_level",
+        level: builder.qualificationLevel === "not_required" ? "preferred" : builder.qualificationLevel,
+        acceptedValues: [builder.minQualification],
+        minMatch: 1,
+      }),
+    );
+  }
+
+  // Fields of study group
+  if (builder.fieldsOfStudy.length > 0) {
+    const required = builder.fieldsOfStudy.filter((f) => f.level === "required" || f.level === "preferred");
+    const hasRequired = required.length > 0;
+    groups.push(
+      createRequirementGroup({
+        name: "Field of Study",
+        type: "education_field",
+        level: hasRequired ? "required" : "preferred",
+        acceptedValues: builder.fieldsOfStudy.map((f) => f.name),
+        minMatch: hasRequired ? required.length : 1,
+      }),
+    );
+  }
+
+  // Experience areas group
+  if (builder.experienceAreas.length > 0) {
+    const required = builder.experienceAreas.filter((a) => a.level === "required" || a.level === "preferred");
+    const hasRequired = required.length > 0;
+    groups.push(
+      createRequirementGroup({
+        name: "Experience Area",
+        type: "experience_area",
+        level: hasRequired ? "required" : "preferred",
+        acceptedValues: builder.experienceAreas.map((a) => a.name),
+        minMatch: 1,
+        minYears: builder.minExperience || 0,
+      }),
+    );
+  }
+
+  // Required skills
+  const requiredSkills = builder.skills.filter((s) => s.level === "required");
+  if (requiredSkills.length > 0) {
+    groups.push(
+      createRequirementGroup({
+        name: "Required Skills",
+        type: "skill_required",
+        level: "required",
+        acceptedValues: requiredSkills.map((s) => s.name),
+        minMatch: Math.max(1, Math.ceil(requiredSkills.length * 0.6)),
+      }),
+    );
+  }
+
+  // Preferred skills
+  const preferredSkills = builder.skills.filter((s) => s.level === "preferred");
+  if (preferredSkills.length > 0) {
+    groups.push(
+      createRequirementGroup({
+        name: "Preferred Skills",
+        type: "skill_preferred",
+        level: "preferred",
+        acceptedValues: preferredSkills.map((s) => s.name),
+        minMatch: 1,
+      }),
+    );
+  }
+
+  // Certifications
+  const requiredCerts = builder.certifications.filter((c) => c.level === "required" || c.level === "preferred");
+  if (requiredCerts.length > 0) {
+    groups.push(
+      createRequirementGroup({
+        name: "Certifications",
+        type: "certification",
+        level: requiredCerts.some((c) => c.level === "required") ? "required" : "preferred",
+        acceptedValues: requiredCerts.map((c) => c.name),
+        minMatch: 1,
+      }),
+    );
+  }
+
+  return groups;
+}
 
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -229,8 +327,8 @@ function TaxonomySearch({
                               ? "custom"
                               : "local",
                         );
+                        setQuery(entry.label);
                         setOpen(false);
-                        setQuery("");
                         setFailed(false);
                       }}
                     >
@@ -264,7 +362,7 @@ function TaxonomySearch({
                       e.preventDefault();
                       const label = query.trim();
                       setOpen(false);
-                      setQuery("");
+                      setQuery(label);
                       onAddNew(label);
                     }}
                   >
@@ -290,7 +388,7 @@ function TaxonomySearch({
                       e.preventDefault();
                       const label = query.trim();
                       setOpen(false);
-                      setQuery("");
+                      setQuery(label);
                       onAddNew(label);
                     }}
                   >
@@ -501,17 +599,15 @@ export function CampaignWizard() {
             mandatory: q.mandatory,
             condition: q.condition ?? null,
           })),
-          scoringModel: builder.requirementGroups.length > 0
-            ? {
-                requirementGroups: builder.requirementGroups,
+          scoringModel: {
+                requirementGroups: generateRequirementGroups(builder),
                 weights: builder.weights as unknown as Record<string, number>,
                 experienceRecencyYears: builder.experienceRecencyYears,
                 targetOccupation: builder.jobTitle,
                 highlyRelevantPositions: builder.highlyRelevantPositions,
                 relatedPositions: builder.relatedPositions,
                 industry: builder.industry,
-              }
-            : null,
+              },
         },
       } as never);
       return (result as { campaignId: string }).campaignId;
@@ -725,9 +821,12 @@ export function CampaignWizard() {
                       .filter((name): name is string => Boolean(name))
                       .filter((name, index, all) => all.indexOf(name) === index)
                       .slice(0, 2);
-                    const mergedAreas = [...new Set([...prev.experienceAreas, ...areaNames])];
-                    if (mergedAreas.length !== prev.experienceAreas.length) {
-                      next.experienceAreas = mergedAreas;
+                    const existingAreaNames = new Set(prev.experienceAreas.map((a) => typeof a === 'string' ? a : a.name));
+                    const newAreas = areaNames
+                      .filter((name) => !existingAreaNames.has(name))
+                      .map((name) => ({ name, level: 'required' as const }));
+                    if (newAreas.length > 0) {
+                      next.experienceAreas = [...prev.experienceAreas, ...newAreas];
                     }
                     const existing = new Set(prev.skills.map((s) => s.name.toLowerCase()));
                     // Only real skill-type entries ("tax legislation",
@@ -1062,26 +1161,64 @@ export function CampaignWizard() {
 
             <div className="space-y-2">
               <Label>Fields of study</Label>
+              <p className="text-xs text-muted-foreground">
+                Required = blocks eligibility if missing. Preferred = bonus points. Related = acceptable but lower score.
+              </p>
               <Picker
                 placeholder="Add a field of study"
                 options={(fieldsOfStudyCatalog.data ?? FIELDS_OF_STUDY).filter(
-                  (f: string) => !builder.fieldsOfStudy.includes(f),
+                  (f: string) => !builder.fieldsOfStudy.some((x) => x.name === f),
                 )}
-                onPick={(value) => patch({ fieldsOfStudy: [...builder.fieldsOfStudy, value] })}
+                onPick={(value) => patch({ fieldsOfStudy: [...builder.fieldsOfStudy, { name: value, level: "required" }] })}
               />
-              <Chips
-                values={builder.fieldsOfStudy}
-                onRemove={(value) =>
-                  patch({ fieldsOfStudy: builder.fieldsOfStudy.filter((f) => f !== value) })
-                }
-              />
+              {builder.fieldsOfStudy.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No fields added yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {builder.fieldsOfStudy.map((field, index) => (
+                    <div key={field.name} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                      <span className="flex-1 text-sm">{field.name}</span>
+                      <Select
+                        value={field.level}
+                        onValueChange={(value) =>
+                          patch({
+                            fieldsOfStudy: builder.fieldsOfStudy.map((f, i) =>
+                              i === index ? { ...f, level: value as typeof f.level } : f,
+                            ),
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="required">Required</SelectItem>
+                          <SelectItem value="preferred">Preferred</SelectItem>
+                          <SelectItem value="related">Related</SelectItem>
+                          <SelectItem value="not_required">Not required</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          patch({ fieldsOfStudy: builder.fieldsOfStudy.filter((_, i) => i !== index) })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label>Experience areas</Label>
               <p className="text-xs text-muted-foreground">
-                The selected job family counts automatically; add other fields this role
-                overlaps with.
+                The selected job family counts automatically; add other fields this role overlaps with.
+                Required = blocks eligibility if missing. Preferred = bonus points. Related = acceptable but lower score.
               </p>
               <TaxonomySearch
                 kind="job_family"
@@ -1089,7 +1226,7 @@ export function CampaignWizard() {
                 source={null}
                 placeholder="Search ESCO job families for this field of work"
                 onPick={(value) =>
-                  patch({ experienceAreas: [...builder.experienceAreas, value] })
+                  patch({ experienceAreas: [...builder.experienceAreas, { name: value, level: "required" }] })
                 }
                 onClear={() => undefined}
               />
@@ -1098,17 +1235,52 @@ export function CampaignWizard() {
                   placeholder="…or add from the local library"
                   options={(allFamilies.data ?? FALLBACK_FAMILIES.map((f) => f.name)).filter(
                     (name: string) =>
-                      name !== builder.jobFamilyName && !builder.experienceAreas.includes(name),
+                      name !== builder.jobFamilyName && !builder.experienceAreas.some((a) => a.name === name),
                   )}
-                  onPick={(value) => patch({ experienceAreas: [...builder.experienceAreas, value] })}
+                  onPick={(value) => patch({ experienceAreas: [...builder.experienceAreas, { name: value, level: "required" }] })}
                 />
               ) : null}
-              <Chips
-                values={builder.experienceAreas}
-                onRemove={(value) =>
-                  patch({ experienceAreas: builder.experienceAreas.filter((a) => a !== value) })
-                }
-              />
+              {builder.experienceAreas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No experience areas added yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {builder.experienceAreas.map((area, index) => (
+                    <div key={area.name} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                      <span className="flex-1 text-sm">{area.name}</span>
+                      <Select
+                        value={area.level}
+                        onValueChange={(value) =>
+                          patch({
+                            experienceAreas: builder.experienceAreas.map((a, i) =>
+                              i === index ? { ...a, level: value as typeof a.level } : a,
+                            ),
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="required">Required</SelectItem>
+                          <SelectItem value="preferred">Preferred</SelectItem>
+                          <SelectItem value="related">Related</SelectItem>
+                          <SelectItem value="not_required">Not required</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          patch({ experienceAreas: builder.experienceAreas.filter((_, i) => i !== index) })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -1808,7 +1980,7 @@ export function CampaignWizard() {
                       patch({
                         weights: weightsForIscoFamily([
                           builder.jobFamilyName,
-                          ...builder.experienceAreas,
+                          ...builder.experienceAreas.map((a) => typeof a === 'string' ? a : a.name),
                         ]),
                       })
                     }
@@ -1900,26 +2072,50 @@ export function CampaignWizard() {
 
             <Separator />
 
-            {/* v2 Requirement Groups */}
-            <RequirementGroupsEditor
-              groups={builder.requirementGroups}
-              onChange={(groups) => patch({ requirementGroups: groups })}
-            />
+            {/* Auto-generated requirement summary */}
+            <div>
+              <h3 className="font-display text-base font-semibold">Requirement Summary</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Requirement groups are automatically generated from the fields you set in Step 2 (Requirements).
+                Edit the required/preferred/related level on each field above — the scoring engine uses those settings.
+              </p>
+              {(() => {
+                const autoGroups = generateRequirementGroups(builder);
+                if (autoGroups.length === 0) {
+                  return (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      No requirements configured yet. Add fields of study, experience areas, skills, or certifications in Step 2.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="mt-3 space-y-2">
+                    {autoGroups.map((group) => (
+                      <div key={group.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                        <Badge variant={group.level === "required" ? "default" : "secondary"}>
+                          {group.level}
+                        </Badge>
+                        <span className="flex-1 text-sm font-medium">{group.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {group.acceptedValues.length} value{group.acceptedValues.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
 
             {/* Test Scoring Button */}
-            {builder.requirementGroups.length > 0 && (
-              <>
-                <Separator />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setTestScoringOpen(true)}
-                >
-                  <Beaker className="mr-2 size-4" />
-                  Test Scoring Rules
-                </Button>
-              </>
-            )}
+            <Separator />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTestScoringOpen(true)}
+            >
+              <Beaker className="mr-2 size-4" />
+              Test Scoring Rules
+            </Button>
           </div>
         ) : null}
 
@@ -2002,14 +2198,14 @@ export function CampaignWizard() {
         open={testScoringOpen}
         onOpenChange={setTestScoringOpen}
         model={{
-          requirementGroups: builder.requirementGroups,
+          requirementGroups: generateRequirementGroups(builder),
           weights: builder.weights as any,
-          experienceRecencyYears: builder.experienceRecencyYears || undefined,
+          ...(builder.experienceRecencyYears ? { experienceRecencyYears: builder.experienceRecencyYears } : {}),
           targetOccupation: builder.jobTitle,
           highlyRelevantPositions: builder.highlyRelevantPositions,
           relatedPositions: builder.relatedPositions,
           industry: builder.industry,
-        }}
+        } as any}
       />
     </div>
   );

@@ -985,9 +985,10 @@ function fieldsOfStudyFromBuilder(builder: unknown): string[] {
   const parsed = parseJsonObject<{ fieldsOfStudy?: unknown }>(builder);
   if (!parsed) return [];
   const fields = parsed.fieldsOfStudy;
-  return Array.isArray(fields)
-    ? fields.filter((field): field is string => typeof field === "string")
-    : [];
+  if (!Array.isArray(fields)) return [];
+  return fields
+    .map((f: unknown) => typeof f === "string" ? f : typeof f === "object" && f !== null && "name" in f ? (f as { name: string }).name : null)
+    .filter((f): f is string => typeof f === "string" && f.length > 0);
 }
 
 /**
@@ -1013,7 +1014,8 @@ function experienceFieldsFromBuilder(builder: unknown): string[] {
   }
   if (Array.isArray(parsed.experienceAreas)) {
     for (const area of parsed.experienceAreas) {
-      if (typeof area === "string" && area.trim()) fields.push(area.trim());
+      const name = typeof area === "string" ? area : typeof area === "object" && area !== null && "name" in area ? (area as { name: string }).name : null;
+      if (name && name.trim()) fields.push(name.trim());
     }
   }
   return [...new Set(fields)];

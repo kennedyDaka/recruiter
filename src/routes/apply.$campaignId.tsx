@@ -742,7 +742,8 @@ function ApplyPage() {
     const experienceAreas = parsed["experienceAreas"];
     if (Array.isArray(experienceAreas)) {
       for (const area of experienceAreas) {
-        if (typeof area === "string" && area.trim()) fields.push(area.trim());
+        const name = typeof area === "string" ? area : typeof area === "object" && area !== null && "name" in area ? (area as { name: string }).name : null;
+        if (name && name.trim()) fields.push(name.trim());
       }
     }
     return [...new Set(fields)];

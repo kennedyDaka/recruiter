@@ -89,6 +89,8 @@ export type CampaignScoringModel = {
   highlyRelevantPositions?: string[];
   /** Related positions */
   relatedPositions?: string[];
+  /** Industry for industry match scoring */
+  industry?: string;
 };
 
 // ─── Eligibility & Score Results ────────────────────────────────────

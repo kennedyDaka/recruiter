@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Beaker } from "lucide-react";
 import { RequirementGroupsEditor } from "@/components/recruitment/RequirementGroupsEditor";
+import { TestScoringDialog } from "@/components/recruitment/TestScoringDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
@@ -348,6 +349,7 @@ export function CampaignWizard() {
   const [step, setStep] = useState(0);
   const [builder, setBuilder] = useState<JobBuilder>(() => defaultBuilder());
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [testScoringOpen, setTestScoringOpen] = useState(false);
   const [published, setPublished] = useState<{ amount: number; days: number; url: string } | null>(
     null,
   );
@@ -1903,6 +1905,21 @@ export function CampaignWizard() {
               groups={builder.requirementGroups}
               onChange={(groups) => patch({ requirementGroups: groups })}
             />
+
+            {/* Test Scoring Button */}
+            {builder.requirementGroups.length > 0 && (
+              <>
+                <Separator />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setTestScoringOpen(true)}
+                >
+                  <Beaker className="mr-2 size-4" />
+                  Test Scoring Rules
+                </Button>
+              </>
+            )}
           </div>
         ) : null}
 
@@ -1979,6 +1996,21 @@ export function CampaignWizard() {
           Next
         </Button>
       </div>
+
+      {/* Test Scoring Dialog */}
+      <TestScoringDialog
+        open={testScoringOpen}
+        onOpenChange={setTestScoringOpen}
+        model={{
+          requirementGroups: builder.requirementGroups,
+          weights: builder.weights as any,
+          experienceRecencyYears: builder.experienceRecencyYears || undefined,
+          targetOccupation: builder.jobTitle,
+          highlyRelevantPositions: builder.highlyRelevantPositions,
+          relatedPositions: builder.relatedPositions,
+          industry: builder.industry,
+        }}
+      />
     </div>
   );
 }

@@ -39,6 +39,7 @@ model Tenant {
   payments       Payment[]
   subscriptions  Subscription[]
   userRoles      UserRole[]
+  incidents      Incident[]
 
   @@map("tenants")
 }
@@ -747,4 +748,95 @@ model University {
 
   @@unique([name, country])
   @@map("universities")
+}
+
+// ─── Incident Management & Support Center ──────────────────────────
+
+model Incident {
+  id             String   @id @default(uuid())
+  incident_number Int     @unique @default(autoincrement())
+  tenant_id      String
+  tenant         Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  // Classification
+  source         String   @default("user_reported") // user_reported | auto_detected | system_monitoring | support_agent
+  priority       String   @default("normal")        // critical | high | normal | low
+  status         String   @default("open")          // detected | open | acknowledged | investigating | waiting_for_customer | resolved | closed | reopened
+  issue_type     String   @default("technical")     // technical | incorrect_info | how_to_question
+  category       String   @default("other")         // recruitment | communication | account | billing | integrations | documents | other
+
+  // Context
+  title          String
+  description    String?
+  error_type     String?  // e.g. WHATSAPP_PROVIDER_TIMEOUT
+  error_message  String?  // truncated system error
+  campaign_id    String?
+  candidate_id   String?
+  action         String?  // e.g. "Send interview invitation"
+  channel        String?  // email | whatsapp | sms | system
+  reference_ids  String?  // JSON — { candidate: "CND-84921", campaign: "Finance Manager" }
+
+  // People
+  reported_by    String   // profile_id of the reporter
+  reporter_name  String?
+  reporter_email String?
+  assigned_to    String?  // support agent profile_id
+
+  // Lifecycle
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+  acknowledged_at DateTime?
+  resolved_at    DateTime?
+  closed_at      DateTime?
+  first_response_at DateTime?
+  resolution_note String?
+
+  // SLA
+  sla_response_deadline DateTime?
+  sla_resolution_deadline DateTime?
+  sla_met              Boolean?
+
+  // Attachments & communication
+  screenshot_url String?  // base64 data URL or file reference
+  whatsapp_msg_id String? // WhatsApp message ID if reported via WhatsApp
+
+  // Relations
+  notes          IncidentNote[]
+  timeline       IncidentEvent[]
+
+  @@index([tenant_id, status])
+  @@index([tenant_id, priority])
+  @@index([tenant_id, created_at])
+  @@map("incidents")
+}
+
+model IncidentNote {
+  id          String   @id @default(uuid())
+  incident_id String
+  incident    Incident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
+  author_id   String   // profile_id
+  author_name String?
+  author_role String?  // customer | support | system
+  body        String
+  is_internal Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  @@index([incident_id, created_at])
+  @@map("incident_notes")
+}
+
+model IncidentEvent {
+  id          String   @id @default(uuid())
+  incident_id String
+  incident    Incident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
+  event_type  String   // created | status_change | priority_change | assignment | note_added | resolved | reopened
+  old_value   String?
+  new_value   String?
+  actor_id    String?
+  actor_name  String?
+  metadata    String?  // JSON for extra context
+  created_at  DateTime @default(now())
+
+  @@index([incident_id, created_at])
+  @@map("incident_events")
 }

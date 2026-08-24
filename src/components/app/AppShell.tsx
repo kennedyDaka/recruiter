@@ -5,6 +5,7 @@ import {
   Briefcase,
   KanbanSquare,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Settings,
   Users,
@@ -20,6 +21,7 @@ const nav = [
   { to: "/kanban", label: "Kanban", icon: KanbanSquare },
   { to: "/candidates", label: "Candidates", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/support", label: "Help & Support", icon: LifeBuoy },
 ] as const;
 
 export function AppShell({

@@ -25,6 +25,7 @@ import type {
   ScoringWeights,
 } from "./ors-requirements";
 import { DEFAULT_SCORING_WEIGHTS } from "./ors-requirements";
+import { normalizeOccupation, normalizeSkill, type NormalizedOccupation, type NormalizedSkill } from "./ors-normalization";
 
 // ─── Qualification Levels ───────────────────────────────────────────
 
@@ -463,6 +464,13 @@ export function scoreApplicationV2(
     ...DEFAULT_SCORING_WEIGHTS,
     ...(model.weights || {}),
   };
+
+  // 0. Normalize candidate input using ISCO/O*NET/ESCO taxonomy
+  // This classifies raw answers into structured data the scoring engine understands
+  const normalizedOccupation = candidate.experienceEntries?.[0]?.title
+    ? normalizeOccupation(candidate.experienceEntries[0].title, model.targetOccupation)
+    : null;
+  const normalizedSkills = (candidate.skills || []).map(normalizeSkill);
 
   // 1. Evaluate eligibility (required groups only)
   const eligibility = evaluateEligibility(model.requirementGroups, candidate);

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Copy, ExternalLink, Loader2, ArrowRight, PartyPopper } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 /* ── Inline brand icons (no extra deps) ── */
@@ -32,15 +32,18 @@ function LinkedInIcon({ className = "h-4 w-4" }: { className?: string }) {
 }
 
 export const Route = createFileRoute("/payment/success")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    tx_ref: (search.tx_ref as string) || "",
-    campaign_id: (search.campaign_id as string) || "",
-  }),
   component: PaymentSuccess,
 });
 
 function PaymentSuccess() {
-  const { tx_ref: txRef, campaign_id: campaignId } = Route.useSearch();
+  // Read query params directly from URL (client-only — window doesn't exist during SSR)
+  const [txRef, setTxRef] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setTxRef(params.get("tx_ref") || "");
+    setCampaignId(params.get("campaign_id") || "");
+  }, []);
   const [copied, setCopied] = useState(false);
 
   // Poll payment status via Vercel API (not TanStack route — won't work on Vercel)

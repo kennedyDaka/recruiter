@@ -2,18 +2,22 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, RotateCcw, Home } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/payment/failed")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    tx_ref: (search.tx_ref as string) || "",
-    campaign_id: (search.campaign_id as string) || "",
-    reason: (search.reason as string) || "Payment was not completed",
-  }),
   component: PaymentFailed,
 });
 
 function PaymentFailed() {
-  const { tx_ref: txRef, campaign_id: campaignId, reason } = Route.useSearch();
+  const [txRef, setTxRef] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [reason, setReason] = useState("Payment was not completed");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setTxRef(params.get("tx_ref") || "");
+    setCampaignId(params.get("campaign_id") || "");
+    setReason(params.get("reason") || "Payment was not completed");
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-[600px] bg-gradient-to-br from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950">

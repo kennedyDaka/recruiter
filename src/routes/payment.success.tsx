@@ -32,13 +32,15 @@ function LinkedInIcon({ className = "h-4 w-4" }: { className?: string }) {
 }
 
 export const Route = createFileRoute("/payment/success")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tx_ref: (search.tx_ref as string) || "",
+    campaign_id: (search.campaign_id as string) || "",
+  }),
   component: PaymentSuccess,
 });
 
 function PaymentSuccess() {
-  const search = Route.useSearch();
-  const txRef = (search as any).tx_ref;
-  const campaignId = (search as any).campaign_id;
+  const { tx_ref: txRef, campaign_id: campaignId } = Route.useSearch();
   const [copied, setCopied] = useState(false);
 
   // Poll payment status via Vercel API (not TanStack route — won't work on Vercel)
@@ -57,16 +59,19 @@ function PaymentSuccess() {
     },
   });
 
+  // Use campaign_id from URL or fall back to payment status API response
+  const resolvedCampaignId = campaignId || paymentStatus?.campaignId || null;
+
   // Fetch campaign details including public_token
   const { data: campaign, isLoading: campaignLoading } = useQuery({
-    queryKey: ["campaign-publish-status", campaignId],
+    queryKey: ["campaign-publish-status", resolvedCampaignId],
     queryFn: async () => {
-      if (!campaignId) return null;
-      const res = await fetch(`/api/payment/status/campaign/${campaignId}`);
+      if (!resolvedCampaignId) return null;
+      const res = await fetch(`/api/payment/status/campaign/${resolvedCampaignId}`);
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: !!campaignId,
+    enabled: !!resolvedCampaignId,
     refetchInterval: (query) => {
       const d = query.state.data;
       if (d?.status === "active" && (d?.publicToken || d?.public_token)) return false;

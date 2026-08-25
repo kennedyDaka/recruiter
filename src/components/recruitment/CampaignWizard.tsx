@@ -460,16 +460,6 @@ export function CampaignWizard() {
     setBuilder((prev) =>
       typeof values === "function" ? { ...prev, ...values(prev) } : { ...prev, ...values },
     );
-  const [importingDuties, setImportingDuties] = useState(false);
-  const [importingOnet, setImportingOnet] = useState(false);
-  const [onetConfigured, setOnetConfigured] = useState<boolean | null>(null);
-
-  // Check O*NET configuration on mount
-  useEffect(() => {
-    onetDuties({ data: { title: "test", limit: 1 } })
-      .then((r: any) => setOnetConfigured(r?.data?.configured ?? false))
-      .catch(() => setOnetConfigured(false));
-  }, []);
 
   const industries = useQuery({
     queryKey: ["industries"],
@@ -1614,99 +1604,9 @@ export function CampaignWizard() {
                     onClear={() => {}}
                   />
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={!builder.jobTitleExternalId || importingDuties}
-                  onClick={async () => {
-                    if (!builder.jobTitleExternalId) return;
-                    setImportingDuties(true);
-                    try {
-                      const result = (await occupationDetail({
-                        data: { uri: builder.jobTitleExternalId },
-                      })) as { data: EscoOccupationDetail | null };
-                      const detail = result.data;
-                      if (!detail) {
-                        toast.error("Could not load duties for this occupation.");
-                        return;
-                      }
-                      const existing = new Set(
-                        builder.responsibilities
-                          .map((r) => r.duty?.toLowerCase())
-                          .filter((d): d is string => Boolean(d)),
-                      );
-                      const all = [...detail.essentialSkills, ...detail.optionalSkills]
-                        .filter((skill) => !existing.has(skill.toLowerCase()))
-                        .slice(0, 30)
-                        .map((skill) => ({ action: "", object: "", duty: skill }));
-                      if (!all.length) {
-                        toast.info("All duties for this occupation are already on the list.");
-                        return;
-                      }
-                      patch({ responsibilities: [...builder.responsibilities, ...all] });
-                      toast.success(`Imported ${all.length} duties for ${detail.label}.`);
-                    } finally {
-                      setImportingDuties(false);
-                    }
-                  }}
-                >
-                  {importingDuties ? "Importing…" : "Import all duties"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={!builder.jobTitle || importingOnet}
-                  onClick={async () => {
-                    if (!builder.jobTitle) return;
-                    setImportingOnet(true);
-                    try {
-                      const result = (await onetDuties({
-                        data: { title: builder.jobTitle, limit: 15 },
-                      })) as { data: { configured: boolean; duties: { label: string }[] } };
-                      const { configured, duties } = result.data;
-                      if (!configured) {
-                        toast.error(
-                          "O*NET is not configured — set the ONET_API_KEY environment variable (free registration at services.onetcenter.org).",
-                        );
-                        return;
-                      }
-                      if (!duties.length) {
-                        toast.info("No O*NET duties found for this occupation.");
-                        return;
-                      }
-                      const existing = new Set(
-                        builder.responsibilities
-                          .map((r) => r.duty?.toLowerCase())
-                          .filter((d): d is string => Boolean(d)),
-                      );
-                      const items = duties
-                        .filter((d) => !existing.has(d.label.toLowerCase()))
-                        .map((d) => ({ action: "", object: "", duty: d.label }));
-                      if (!items.length) {
-                        toast.info("All O*NET duties are already on the list.");
-                        return;
-                      }
-                      patch({ responsibilities: [...builder.responsibilities, ...items] });
-                      toast.success(`Imported ${items.length} duties from O*NET.`);
-                    } finally {
-                      setImportingOnet(false);
-                    }
-                  }}
-                >
-                  {importingOnet ? "Importing…" : "Import from O*NET"}
-                </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                The duty search draws on the live ESCO skill catalog (13,000+ skills); importing
-                all duties adds every essential and optional duty ESCO lists for the occupation.
-                {" "}
-                {onetConfigured === false ? (
-                  <span className="text-amber-600">O*NET is not configured — set ONET_API_KEY to enable real task statements.</span>
-                ) : onetConfigured === true ? (
-                  <span className="text-emerald-600">O*NET is active and contributing real task statements.</span>
-                ) : null}
+                Search and add duties one by one. Use the search above to find relevant duties from the ESCO catalog.
               </p>
             </div>
 

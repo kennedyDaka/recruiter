@@ -143,7 +143,7 @@ export const Route = createFileRoute("/api/payment/initiate")({
                 last_name: lastName,
                 email: data.customer.email,
                 callback_url: `${process.env["APP_URL"]}/api/payment/webhook`,
-                return_url: `${process.env["APP_URL"]}/payment/success?tx_ref=${txRef}`,
+                return_url: `${process.env["APP_URL"]}/payment/success?tx_ref=${txRef}&campaign_id=${data.campaignId}`,
                 customization: {
                   title: "Operon Recruit",
                   description: `${data.numDays}-day campaign activation`,

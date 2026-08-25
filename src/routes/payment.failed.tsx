@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, RotateCcw, Home } from "lucide-react";
 
 export const Route = createFileRoute("/payment/failed")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tx_ref: (search.tx_ref as string) || "",
+    campaign_id: (search.campaign_id as string) || "",
+    reason: (search.reason as string) || "Payment was not completed",
+  }),
   component: PaymentFailed,
 });
 
 function PaymentFailed() {
-  const search = Route.useSearch();
-  const txRef = (search as any).tx_ref;
-  const campaignId = (search as any).campaign_id;
-  const reason = (search as any).reason || "Payment was not completed";
+  const { tx_ref: txRef, campaign_id: campaignId, reason } = Route.useSearch();
 
   return (
     <div className="flex items-center justify-center min-h-[600px] bg-gradient-to-br from-slate-50 to-red-50 dark:from-slate-900 dark:to-red-950">

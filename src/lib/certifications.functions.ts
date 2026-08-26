@@ -10,7 +10,6 @@ const certificationSearchSchema = z.object({
 export type CertificationEntry = {
   id: string;
   name: string;
-  full_name: string | null;
   category: string | null;
 };
 
@@ -24,9 +23,9 @@ export const searchCertificationCatalog = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const trimmed = data.query.trim();
     const rows = (await dbQuery(
-      `SELECT id, name, full_name, category
+      `SELECT id, name, category
        FROM certification_library
-       WHERE ? = '' OR name LIKE '%' || ? || '%' OR full_name LIKE '%' || ? || '%'
+       WHERE ? = '' OR name LIKE '%' || ? || '%' 
        ORDER BY
          CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
          name

@@ -1374,11 +1374,12 @@ function ApplyPage() {
                           onChange={(event) => set("email")(event.target.value)}
                         />
                       </Field>
-                      <Field label="Phone" htmlFor="phone">
+                      <Field label="Phone" htmlFor="phone" hint={"Include country code, e.g. " + (DIAL_CODES[form.country] ?? '+265') + " 991 234 567. Do not start with 0."}>
                         <Input
                           id="phone"
                           inputMode="tel"
                           maxLength={40}
+                          placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
                           value={form.phone}
                           onChange={(event) => set("phone")(event.target.value)}
                         />
@@ -1387,7 +1388,7 @@ function ApplyPage() {
                         <Select
                           value={form.country}
                           onValueChange={(value) =>
-                            setForm((previous) => ({ ...previous, country: value, city: "" }))
+                            setForm((previous) => { const prefix = DIAL_CODES[value] ?? previous.phone.split(' ').slice(0, previous.phone.startsWith('+') ? 1 : 0).join(' '); return { ...previous, country: value, city: "", phone: previous.phone.startsWith('+') ? previous.phone : (prefix ? prefix + ' ' : '') + previous.phone }; })
                           }
                         >
                           <SelectTrigger id="country">
@@ -2046,11 +2047,12 @@ function ApplyPage() {
                               }
                             />
                           </Field>
-                          <Field label="Phone" htmlFor={`ref-phone-${index}`}>
+                          <Field label="Phone" htmlFor={`ref-phone-${index}`} hint={"Include country code, e.g. " + (DIAL_CODES[form.country] ?? '+265') + " 991 234 567"}>
                             <Input
                               id={`ref-phone-${index}`}
                               inputMode="tel"
                               maxLength={40}
+                              placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
                               value={entry.phone}
                               onChange={(event) =>
                                 updateReferee(index, { phone: event.target.value })
@@ -2681,16 +2683,19 @@ function Field({
   htmlFor,
   children,
   className,
+  hint,
 }: {
   label: string;
   htmlFor: string;
   children: ReactNode;
   className?: string;
+  hint?: string;
 }) {
   return (
     <div className={`space-y-2 ${className ?? ""}`}>
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

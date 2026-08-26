@@ -35,7 +35,8 @@ function AuthenticatedGate() {
         return;
       }
 
-      if (!session.tenantId && pathname !== "/onboarding") {
+      // Super admins can access without a tenant; regular users need one
+      if (!session.tenantId && (session as any).role !== "super_admin" && pathname !== "/onboarding") {
         navigate({ to: "/onboarding", replace: true });
         return;
       }

@@ -24,6 +24,7 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/support", label: "Help & Support", icon: LifeBuoy },
   { to: "/contact-center", label: "Contact Center", icon: Headphones },
+  { to: "/admin", label: "Admin Dashboard", icon: LayoutDashboard },
 ] as const;
 
 export function AppShell({
@@ -40,9 +41,10 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const getSession = useServerFn(getCurrentSessionFn);
   const [email, setEmail] = useState<string | null>(null);
+  const [role, setRole] = useState<string>("company_admin");
 
   useEffect(() => {
-    getSession().then((session) => setEmail(session?.email ?? null));
+    getSession().then((session) => { setEmail(session?.email ?? null); setRole((session as any)?.role ?? 'company_admin'); });
   }, [getSession]);
 
   function signOut() {
@@ -59,7 +61,8 @@ export function AppShell({
           </Link>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {nav.map((item) => {
+{const filteredNav = nav.filter(item => role !== "super_admin" ? item.to !== "/contact-center" && item.to !== "/admin" : true);
+          filteredNav.map((item) => {
             const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
             return (
               <Link

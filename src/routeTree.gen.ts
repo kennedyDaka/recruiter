@@ -36,6 +36,7 @@ import { Route as AuthenticatedCampaignsNewRouteImport } from './routes/_authent
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as ApiAuthLinkedinRouteImport } from './routes/api/auth/linkedin'
 import { Route as ApiCampaignsCampaignIdRouteImport } from './routes/api/campaigns.$campaignId'
+import { Route as ApiCatalogsUniversitiesRouteImport } from './routes/api/catalogs/universities'
 import { Route as ApiPaymentInitiateRouteImport } from './routes/api/payment/initiate'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
 import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './routes/_authenticated/campaigns.$campaignId.index'
@@ -185,6 +186,11 @@ const ApiCampaignsCampaignIdRoute = ApiCampaignsCampaignIdRouteImport.update({
   path: '/api/campaigns/$campaignId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCatalogsUniversitiesRoute = ApiCatalogsUniversitiesRouteImport.update({
+  id: '/api/catalogs/universities',
+  path: '/api/catalogs/universities',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPaymentInitiateRoute = ApiPaymentInitiateRouteImport.update({
   id: '/api/payment/initiate',
   path: '/api/payment/initiate',
@@ -261,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
+  '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/campaigns/': typeof AuthenticatedCampaignsIndexRoute
@@ -297,6 +304,7 @@ export interface FileRoutesByTo {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
+  '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/campaigns': typeof AuthenticatedCampaignsIndexRoute
@@ -336,6 +344,7 @@ export interface FileRoutesById {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/auth/linkedin': typeof ApiAuthLinkedinRouteWithChildren
   '/api/campaigns/$campaignId': typeof ApiCampaignsCampaignIdRoute
+  '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
   '/_authenticated/campaigns/': typeof AuthenticatedCampaignsIndexRoute
@@ -375,6 +384,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
+    | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/campaigns/'
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
+    | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/campaigns'
@@ -449,6 +460,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/auth/linkedin'
     | '/api/campaigns/$campaignId'
+    | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
     | '/_authenticated/campaigns/'
@@ -478,6 +490,7 @@ export interface RootRouteChildren {
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiAuthLinkedinRoute: typeof ApiAuthLinkedinRouteWithChildren
   ApiCampaignsCampaignIdRoute: typeof ApiCampaignsCampaignIdRoute
+  ApiCatalogsUniversitiesRoute: typeof ApiCatalogsUniversitiesRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
   ApiPaymentStatusTxRefRoute: typeof ApiPaymentStatusTxRefRoute
@@ -675,6 +688,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCampaignsCampaignIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/catalogs/universities': {
+      id: '/api/catalogs/universities'
+      path: '/api/catalogs/universities'
+      fullPath: '/api/catalogs/universities'
+      preLoaderRoute: typeof ApiCatalogsUniversitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/payment/initiate': {
       id: '/api/payment/initiate'
       path: '/api/payment/initiate'
@@ -836,6 +856,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiAuthLinkedinRoute: ApiAuthLinkedinRouteWithChildren,
   ApiCampaignsCampaignIdRoute: ApiCampaignsCampaignIdRoute,
+  ApiCatalogsUniversitiesRoute: ApiCatalogsUniversitiesRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,
   ApiPaymentStatusTxRefRoute: ApiPaymentStatusTxRefRoute,

@@ -25,12 +25,12 @@ export const searchCertificationCatalog = createServerFn({ method: "POST" })
     const rows = (await dbQuery(
       `SELECT id, name, category
        FROM certification_library
-       WHERE ? = '' OR name LIKE '%' || ? || '%' 
+       WHERE ? = '' OR name ILIKE '%' || ? || '%' 
        ORDER BY
-         CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
+         CASE WHEN name ILIKE ? || '%' THEN 0 ELSE 1 END,
          name
        LIMIT ?`,
-      [trimmed, trimmed, trimmed, trimmed ? `${trimmed}%` : "", data.limit],
+      [trimmed, trimmed, trimmed ? `${trimmed}%` : "", data.limit],
     )) as unknown as CertificationEntry[];
     return { data: rows };
   });

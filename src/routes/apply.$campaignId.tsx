@@ -251,6 +251,8 @@ function UniversitySearch({
   const universitySearch = useServerFn(searchUniversityCatalog);
   const addUniversity = useServerFn(addUniversityToMaster);
   const [query, setQuery] = useState(value);
+  // Sync when parent resets value (e.g. cleared from outside)
+  useEffect(() => { setQuery(value); }, [value]);
   const [hits, setHits] = useState<UniversityEntry[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -305,9 +307,12 @@ function UniversitySearch({
         onBlur={() =>
           setTimeout(() => {
             setOpen(false);
-            // Canonicalise to the picked institution; keep free typing as a
-            // fallback for institutions missing from the library.
-            onPick(query.trim());
+            const trimmed = query.trim();
+            if (trimmed.length === 0) {
+              onClear();
+            } else {
+              onPick(trimmed);
+            }
           }, 150)
         }
       />
@@ -890,6 +895,38 @@ function ApplyPage() {
     [campaign?.required_documents?.length, questions?.length],
   );
   const currentStep = applicationSteps[wizardStep]?.id ?? "review";
+  // ── Step validation for Continue button ──
+  const canContinue = useMemo(() => {
+    if (currentStep === "contact") {
+      return (
+        form.first_name.trim().length > 0 &&
+        form.last_name.trim().length > 0 &&
+        form.email.trim().length > 0 &&
+        /^S+@S+.S+$/.test(form.email.trim()) &&
+        form.country.length > 0 &&
+        form.city.trim().length > 0 &&
+        form.professional_summary.trim().length >= 40 &&
+        skills.length > 0
+      );
+    }
+    if (currentStep === "education") {
+      const requiredCerts = campaign?.required_certifications ?? [];
+      const missingCerts = requiredCerts.filter(
+        (cert) => !certifications.some((held) => held.toLowerCase() === cert.toLowerCase()),
+      );
+      return education.every(
+        (entry) => entry.qualification && entry.institution.trim().length > 0 && entry.field_of_study.trim().length > 0,
+      ) && missingCerts.length === 0;
+    }
+    if (currentStep === "experience") {
+      const refsValid = referees.filter(
+        (ref) => ref.name.trim() && (ref.email.trim() || ref.phone.trim()),
+      ).length >= (campaign?.referee_count ?? 2);
+      return refsValid;
+    }
+    return true;
+  }, [currentStep, form, education, skills, certifications, referees, campaign?.referee_count, campaign?.required_certifications]);
+
 
   useEffect(() => {
     setDraftLoaded(false);
@@ -1031,82 +1068,7 @@ function ApplyPage() {
   };
 
   const continueApplication = () => {
-    if (currentStep === "contact") {
-      // Combined: Contact + Profile + Skills
-      if (
-        !form.first_name.trim() ||
-        !form.last_name.trim() ||
-        !form.email.trim() ||
-        !form.country ||
-        !form.city.trim()
-      ) {
-        toast.error("Complete your name, email, country, and city to continue.");
-        return;
-      }
-      if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-        toast.error("Enter a valid email address to continue.");
-        return;
-      }
-      if (form.professional_summary.trim().length < 40) {
-        toast.error("Add a short professional summary of at least 40 characters.");
-        return;
-      }
-      if (skills.length === 0) {
-        toast.error("Add at least one skill to continue.");
-        return;
-      }
-    }
-
-    if (currentStep === "education") {
-      // Combined: Education + Certifications
-      const incomplete = education.some(
-        (entry) =>
-          !entry.qualification || !entry.institution.trim() || !entry.field_of_study.trim(),
-      );
-      if (incomplete) {
-        toast.error(
-          "Complete the qualification, field of study, and institution for each education record.",
-        );
-        return;
-      }
-      const requiredCerts = campaign?.required_certifications ?? [];
-      const missingCerts = requiredCerts.filter(
-        (cert) => !certifications.some((held) => held.toLowerCase() === cert.toLowerCase()),
-      );
-      if (missingCerts.length) {
-        toast.error(`Add the required certification${missingCerts.length === 1 ? "" : "s"}: ${missingCerts.join(", ")}.`);
-        return;
-      }
-    }
-
-    if (currentStep === "experience") {
-      // Combined: Experience + References
-      const incomplete = experience.some(
-        (entry) =>
-          Boolean(entry.employer || entry.position || entry.start_date || entry.end_date) &&
-          (!entry.employer.trim() || !entry.position.trim() || !entry.start_date || !entry.field),
-      );
-      const invalidDate = experience.some(
-        (entry) => entry.start_date && entry.end_date && entry.end_date < entry.start_date,
-      );
-      if (incomplete || invalidDate) {
-        toast.error(
-          "Each work record needs an employer, position, its field of work, valid dates, and no end date before its start date.",
-        );
-        return;
-      }
-      const refRequired = campaign?.referee_count ?? 2;
-      const refValid = referees.filter(
-        (referee) => referee.name.trim() && (referee.email.trim() || referee.phone.trim()),
-      );
-      if (refValid.length < refRequired) {
-        toast.error(
-          `Add ${refRequired} reference${refRequired === 1 ? "" : "s"} with a name and contact detail.`,
-        );
-        return;
-      }
-    }
-
+    if (!canContinue) return;
     setWizardStep((value) => Math.min(value + 1, applicationSteps.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1374,16 +1336,6 @@ function ApplyPage() {
                           onChange={(event) => set("email")(event.target.value)}
                         />
                       </Field>
-                      <Field label="Phone" htmlFor="phone" hint={"Include country code, e.g. " + (DIAL_CODES[form.country] ?? '+265') + " 991 234 567. Do not start with 0."}>
-                        <Input
-                          id="phone"
-                          inputMode="tel"
-                          maxLength={40}
-                          placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
-                          value={form.phone}
-                          onChange={(event) => set("phone")(event.target.value)}
-                        />
-                      </Field>
                       <Field label="Country" htmlFor="country">
                         <Select
                           value={form.country}
@@ -1402,6 +1354,16 @@ function ApplyPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </Field>
+                      <Field label="Phone" htmlFor="phone" hint={"Include country code, e.g. " + (DIAL_CODES[form.country] ?? '+265') + " 991 234 567. Do not start with 0."}>
+                        <Input
+                          id="phone"
+                          inputMode="tel"
+                          maxLength={40}
+                          placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
+                          value={form.phone}
+                          onChange={(event) => set("phone")(event.target.value)}
+                        />
                       </Field>
                       <Field label="City" htmlFor="city">
                         <Input
@@ -1480,41 +1442,9 @@ function ApplyPage() {
                     <SectionHeading
                       icon={Wrench}
                       title="Skills"
-                      subtitle="Choose skills from the role and catalog so they can be matched consistently."
+                      subtitle="Add your skills so they can be matched to the role requirements."
                     />
-                    {(campaign?.required_skills?.length ?? 0) > 0 ? (
-                      <div className="mt-5">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Role-required skills
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {campaign?.required_skills?.map((skill) => (
-                            <Button
-                              key={skill}
-                              type="button"
-                              size="sm"
-                              variant={
-                                skills.some(
-                                  (selected) => selected.toLowerCase() === skill.toLowerCase(),
-                                )
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                              onClick={() => addSkill(skill)}
-                            >
-                              {skills.some(
-                                (selected) => selected.toLowerCase() === skill.toLowerCase(),
-                              ) ? (
-                                <CheckCircle2 className="mr-1.5 size-3.5" />
-                              ) : (
-                                <Plus className="mr-1.5 size-3.5" />
-                              )}
-                              {skill}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
+                    
                     <div className="mt-5 flex gap-2">
                       <Input
                         list="skill-suggestions"
@@ -2216,7 +2146,7 @@ function ApplyPage() {
                     {mutation.isPending ? "Submitting..." : "Review and submit"}
                   </Button>
                 ) : (
-                  <Button type="button" size="lg" onClick={continueApplication}>
+                  <Button type="button" size="lg" disabled={!canContinue} onClick={continueApplication}>
                     Continue
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>

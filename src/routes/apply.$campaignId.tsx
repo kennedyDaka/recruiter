@@ -32,7 +32,7 @@ import {
 } from "@/lib/universities.functions";
 import type { UniversityEntry } from "@/lib/university-catalog";
 import { searchCertificationCatalog, type CertificationEntry } from "@/lib/certifications.functions";
-import { APPLICANT_COUNTRIES, CITIES_BY_COUNTRY, FIELDS_OF_STUDY } from "@/lib/applicant-catalog";
+import { APPLICANT_COUNTRIES, CITIES_BY_COUNTRY, DIAL_CODES, FIELDS_OF_STUDY } from "@/lib/applicant-catalog";
 import { FALLBACK_FAMILIES, FALLBACK_SKILLS } from "@/lib/recruitment-catalog";
 import { QUALIFICATION_LEVELS, yearsFromExperience } from "@/lib/ors";
 import { Logo } from "@/components/brand/Logo";

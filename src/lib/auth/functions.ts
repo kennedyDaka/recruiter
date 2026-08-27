@@ -519,6 +519,13 @@ export const signInFn = createServerFn({ method: "POST" })
 
     await clearFailedAttempts(profile.email);
 
+    // Look up the user role
+    const roleRow = await dbQueryFirst(
+      "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
+      [profile.id],
+    );
+    const role = (roleRow?.role as string) ?? "company_admin";
+
     const token = await createSession({
       userId: profile.id,
       email: profile.email,
@@ -527,7 +534,7 @@ export const signInFn = createServerFn({ method: "POST" })
     });
     await setSessionCookieServer(token);
 
-    return { userId: profile.id, email: profile.email, token };
+    return { userId: profile.id, email: profile.email, token, role };
   });
 
 export const signOutFn = createServerFn({ method: "POST" })

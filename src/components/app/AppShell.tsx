@@ -52,6 +52,10 @@ export function AppShell({
     window.location.assign("/session/signout");
   }
 
+  const filteredNav = role === "super_admin"
+    ? [...nav]
+    : nav.filter(item => item.to !== "/contact-center" && item.to !== "/admin");
+
   return (
     <div className="flex min-h-screen bg-secondary/30">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-background md:flex">
@@ -61,8 +65,7 @@ export function AppShell({
           </Link>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
-{const filteredNav = nav.filter(item => role !== "super_admin" ? item.to !== "/contact-center" && item.to !== "/admin" : true);
-          filteredNav.map((item) => {
+{filteredNav.map((item) => {
             const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
             return (
               <Link

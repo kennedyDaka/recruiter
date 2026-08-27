@@ -29,12 +29,14 @@ export const Route = createFileRoute("/session/callback")({
 
     let verified = false;
     let tenantId: string | null = null;
+    let role: string | null = null;
     if (search.token) {
       const result = await establishSessionFn({ data: { token: search.token } });
       verified = Boolean(result?.verified);
       tenantId = result?.tenantId ?? null;
+      role = (result as any)?.role ?? null;
     }
-    const fallback = tenantId ? "/dashboard" : "/onboarding";
+    const fallback = role === "super_admin" ? "/admin" : tenantId ? "/dashboard" : "/onboarding";
     return { verified, target: verified ? safeTarget(search.redirect ?? fallback) : "/auth" };
   },
   component: SessionCallbackPage,

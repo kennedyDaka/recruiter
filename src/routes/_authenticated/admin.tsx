@@ -229,7 +229,8 @@ function AdminDashboard() {
             <p className="mt-3 font-display text-3xl font-semibold">
               {stats?.openIncidents ?? 0}
             </p>
-   
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Open Incidents
             </p>
           </CardContent>
         </Card>

@@ -44,7 +44,17 @@ export const establishSessionFn = createServerFn({ method: "POST" })
     const { setSessionCookieServer } = await import("@/lib/auth/session.server");
     const payload = await verifySession(data.token);
     if (payload) await setSessionCookieServer(data.token);
-    return { verified: Boolean(payload), tenantId: payload?.tenantId ?? null };
+    // Look up role so session callback can redirect super_admin to /admin
+    let role: string | null = null;
+    if (payload?.userId) {
+      const { dbQueryFirst } = await import("@/lib/db");
+      const roleRow = await dbQueryFirst(
+        "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
+        [payload.userId],
+      );
+      role = (roleRow?.role as string) ?? null;
+    }
+    return { verified: Boolean(payload), tenantId: payload?.tenantId ?? null, role };
   });
 
 /** Deletes the httpOnly session cookie (called from the sign-out route loader). */

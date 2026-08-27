@@ -138,10 +138,10 @@ function AuthPage() {
         if (result?.token) {
           // Establish the httpOnly session cookie via a full page load through
           // the callback route (server functions cannot set cookies in RPC).
+          const role = (result as any)?.role;
+          const dest = role === "super_admin" ? "/admin" : takeStoredDestination(destination);
           window.location.assign(
-            `/session/callback?token=${encodeURIComponent(result.token)}&redirect=${encodeURIComponent(
-              takeStoredDestination(destination),
-            )}`,
+            `/session/callback?token=${encodeURIComponent(result.token)}&redirect=${encodeURIComponent(dest)}`,
           );
         } else {
           toast.error("Sign in failed. Please try again.");

@@ -1,14 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 /**
  * Fetches a public campaign by public_token or campaign ID.
  * Runs on the server to bypass RLS.
  */
 export const getPublicCampaignFn = createServerFn({ method: "GET" })
-  .validator((input: unknown) => {
-    const { z } = require("zod");
-    return z.object({ token: z.string() }).parse(input);
-  })
+  .validator((input: unknown) => z.object({ token: z.string() }).parse(input))
   .handler(async ({ data }) => {
     const { dbQueryFirst } = await import("@/lib/db");
 

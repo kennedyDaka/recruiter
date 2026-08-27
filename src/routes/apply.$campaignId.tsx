@@ -1218,7 +1218,7 @@ function ApplyPage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ ...brandTheme, backgroundColor: 'var(--brand-bg-secondary)', fontFamily: brandFont }}>
+    <div className="min-h-screen bg-slate-50" style={{ ...brandTheme, fontFamily: brandFont }}>
       {jobPostingLd ? (
         <script
           type="application/ld+json"
@@ -1240,7 +1240,7 @@ function ApplyPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         {done ? (
           <div className="rounded-lg border border-border bg-card p-10 text-center shadow-sm">
             <CheckCircle2 className="mx-auto size-10 text-primary" />
@@ -1267,28 +1267,28 @@ function ApplyPage() {
           />
         ) : (
           <>
-            <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-4 min-w-0">
                 <RecruiterBrand recruiter={campaign?.tenants ?? null} compact logoData={companyLogo} brandColor={brandColor} />
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#94a3b8' }}>
                     Application wizard
                   </p>
-                  <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
+                  <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: '#1e293b' }}>
                     {campaign?.job_title ?? "Apply"}
                   </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm" style={{ color: '#64748b' }}>
                     {[campaign?.location, campaign?.employment_type].filter(Boolean).join(" - ") ||
                       "Structured candidate application"}
                   </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-2 text-xs" style={{ color: '#94a3b8' }}>
                     {lastSavedAt
                       ? `Saved automatically on this device at ${new Date(lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                       : "Your progress is saved automatically on this device."}
                   </p>
                 </div>
               </div>
-              <Button type="button" variant="ghost" onClick={() => setStarted(false)}>
+              <Button type="button" variant="ghost" onClick={() => setStarted(false)} className="shrink-0">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Vacancy details
               </Button>
@@ -1307,7 +1307,7 @@ function ApplyPage() {
               {currentStep === "contact" ? (
                 <>
                   {/* ── Contact details ── */}
-                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                     <SectionHeading
                       icon={CircleUserRound}
                       title="Contact details"
@@ -1401,7 +1401,7 @@ function ApplyPage() {
                   </section>
 
                   {/* ── Professional profile ── */}
-                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                     <SectionHeading
                       icon={CircleUserRound}
                       title="Professional profile"
@@ -1444,7 +1444,7 @@ function ApplyPage() {
                   </section>
 
                   {/* ── Skills ── */}
-                  <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                     <SectionHeading
                       icon={Wrench}
                       title="Skills"
@@ -1499,7 +1499,7 @@ function ApplyPage() {
 
               {currentStep === "education" ? (
                 <>
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={GraduationCap}
                     title="Education"
@@ -1632,7 +1632,7 @@ function ApplyPage() {
                 </section>
 
                 {/* ── Certifications ── */}
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={Award}
                     title="Certifications"
@@ -1751,7 +1751,7 @@ function ApplyPage() {
 
               {currentStep === "experience" ? (
                 <>
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={BriefcaseBusiness}
                     title="Experience"
@@ -1906,7 +1906,7 @@ function ApplyPage() {
                 </section>
 
                 {/* ── Professional references ── */}
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={UserRoundCheck}
                     title="Professional references"
@@ -2016,7 +2016,7 @@ function ApplyPage() {
 
 
               {currentStep === "documents" ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={FileText}
                     title="Documents"
@@ -2090,7 +2090,7 @@ function ApplyPage() {
 
 
               {currentStep === "screening" && questions?.length ? (
-                <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
                   <SectionHeading
                     icon={CheckCircle2}
                     title="Screening"
@@ -2134,7 +2134,7 @@ function ApplyPage() {
                 />
               ) : null}
 
-              <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
+              <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   type="button"
                   variant="outline"
@@ -2343,7 +2343,7 @@ function ApplicationReview({
 }) {
   const answered = questions.filter((question) => !isBlankAnswer(answers[question.id])).length;
   return (
-    <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
       <SectionHeading
         icon={CheckCircle2}
         title="Review your application"
@@ -2444,14 +2444,14 @@ function VacancyOverview({
     );
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm sm:p-8">
+      <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
+          <div className="min-w-0 max-w-3xl">
             <RecruiterBrand recruiter={campaign.tenants} logoData={companyLogo} brandColor={brandColor} />
-            <p className="mt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="mt-6 text-xs font-medium uppercase tracking-wider" style={{ color: '#94a3b8' }}>
               Open vacancy
             </p>
-            <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl" style={{ color: brandColor }}>
+            <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl" style={{ color: brandColor }}>
               {campaign.job_title ?? campaign.name ?? "Open role"}
             </h1>
             {campaign.name && campaign.name !== campaign.job_title ? (
@@ -2699,7 +2699,7 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
 }
 function VacancySection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-lg border border-border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="font-display text-lg font-semibold">{title}</h2>
       <div className="mt-4 space-y-3">{children}</div>
     </section>

@@ -147,5 +147,16 @@ export function generateBrandTheme(hex: string): Record<string, string> {
     "--primary": hex,
     "--primary-foreground": l > 55 ? '#1e293b' : '#ffffff',
     "--ring": hex,
+    // Foreground overrides — ensures text is always readable on brand backgrounds
+    "--foreground": '#1e293b',
+    "--muted-foreground": '#64748b',
+    "--card-foreground": '#1e293b',
+    "--popover-foreground": '#1e293b',
+    "--background": l > 55 ? '#ffffff' : '#ffffff',
+    "--card": '#ffffff',
+    "--muted": l > 55 ? '#f1f5f9' : '#f1f5f9',
+    "--popover": '#ffffff',
+    "--border": l > 55 ? `hsl(${h}, ${s}%, ${Math.min(l + 20, 92)}%)` : '#e2e8f0',
+    "--input": l > 55 ? `hsl(${h}, ${s}%, ${Math.min(l + 20, 92)}%)` : '#e2e8f0',
   };
 }

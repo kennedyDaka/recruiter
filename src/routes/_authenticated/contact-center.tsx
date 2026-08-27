@@ -8,6 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { getCurrentSessionFn } from "@/lib/auth/session.functions";
 import {
   listIncidentsFn,
   getIncidentFn,
@@ -80,6 +81,25 @@ const STATUS_COLORS: Record<string, string> = {
 
 function ContactCenterPage() {
   const queryClient = useQueryClient();
+  const getSession = useServerFn(getCurrentSessionFn);
+  const { data: session } = useQuery({
+    queryKey: ["cc-session"],
+    queryFn: () => getSession(),
+  });
+  const isAdmin = (session as any)?.role === "super_admin";
+
+  if (session && !isAdmin) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-secondary/30">
+        <div className="text-center">
+          <Headphones className="mx-auto size-12 text-muted-foreground/30" />
+          <p className="mt-4 text-lg font-medium">Access Restricted</p>
+          <p className="mt-1 text-sm text-muted-foreground">The Contact Center is only available to platform administrators.</p>
+        </div>
+      </div>
+    );
+  }
+
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);

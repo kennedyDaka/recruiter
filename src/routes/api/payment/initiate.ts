@@ -184,8 +184,20 @@ export const Route = createFileRoute("/api/payment/initiate")({
             txRef,
             checkoutUrl: paychanguData.data.checkout_url,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Payment initiation error:", error);
+          try {
+            const { reportIncident } = await import("@/lib/auto-incident");
+            await reportIncident({
+              title: `Payment initiation failed`,
+              description: error?.message ?? String(error),
+              priority: "high",
+              category: "billing",
+              errorType: "PAYMENT_INITIATION_FAILED",
+              errorMessage: error?.message ?? String(error),
+              channel: "payment",
+            });
+          } catch {}
           return json({ error: "Internal server error" }, { status: 500 });
         }
       },

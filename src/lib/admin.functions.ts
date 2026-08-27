@@ -36,7 +36,7 @@ export const getAdminStatsFn = createServerFn({ method: "GET" }).handler(
     const users = usersRes.data ?? [];
 
     const totalRevenue = payments
-      .filter((p) => p.status === "success")
+      .filter((p) => ["success", "completed", "paid"].includes(p.status))
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
     const avgScore = applications.length
@@ -71,7 +71,7 @@ export const getAdminStatsFn = createServerFn({ method: "GET" }).handler(
       criticalIncidents: criticalIncidents.length,
       tenants: tenants.slice(0, 10),
       recentPayments: payments
-        .filter((p) => p.status === "success")
+        .filter((p) => ["success", "completed", "paid"].includes(p.status))
         .slice(0, 5),
     };
   },

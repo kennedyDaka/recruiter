@@ -277,6 +277,18 @@ export async function sendEmail(
       }
       // Both failed — return the Resend error as primary
       console.error(`[Email] Both Resend and SMTP failed. Resend: ${primary.error} | SMTP: ${fallback.error}`);
+      try {
+        const { reportIncident } = await import("@/lib/auto-incident");
+        await reportIncident({
+          title: `Email delivery failed: ${input.subject}`,
+          description: `Both Resend and SMTP failed to deliver to ${input.to}.\nResend: ${primary.error}\nSMTP: ${fallback.error}`,
+          priority: "high",
+          category: "communication",
+          errorType: "EMAIL_DELIVERY_FAILED",
+          errorMessage: `Resend: ${primary.error} | SMTP: ${fallback.error}`,
+          channel: "email",
+        });
+      } catch {}
     }
 
     return primary;

@@ -79,12 +79,36 @@ export const Route = createFileRoute("/api/payment/webhook")({
 
           if (!result?.processed) {
             console.error("Webhook processing failed:", result?.error);
+            try {
+              const { reportIncident } = await import("@/lib/auto-incident");
+              await reportIncident({
+                title: `PayChangu webhook processing failed`,
+                description: result?.error ?? "Unknown processing error",
+                priority: "high",
+                category: "billing",
+                errorType: "WEBHOOK_PROCESSING_FAILED",
+                errorMessage: result?.error,
+                channel: "webhook",
+              });
+            } catch {}
             return json({ error: result?.error ?? "Processing failed" }, { status: 400 });
           }
 
           return json({ received: true });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Webhook error:", error);
+          try {
+            const { reportIncident } = await import("@/lib/auto-incident");
+            await reportIncident({
+              title: `PayChangu webhook error`,
+              description: error?.message ?? String(error),
+              priority: "critical",
+              category: "billing",
+              errorType: "WEBHOOK_ERROR",
+              errorMessage: error?.message ?? String(error),
+              channel: "webhook",
+            });
+          } catch {}
           return json({ error: "Internal server error" }, { status: 500 });
         }
       },

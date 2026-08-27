@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getTenantCandidatesFn } from "@/lib/candidates.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,18 +26,10 @@ export const Route = createFileRoute("/_authenticated/candidates")({
 });
 
 function CandidatesPage() {
+  const fetchCandidates = useServerFn(getTenantCandidatesFn);
   const { data, isLoading } = useQuery({
     queryKey: ["candidates-with-applications"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("applications")
-        .select(
-          "id, reference, score, recommendation, eligibility_status, years_experience, highest_qualification, submitted_at, candidates(first_name, last_name, email, phone, location)",
-        )
-        .order("score", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchCandidates(),
   });
 
   const applications = (data ?? []) as any[];

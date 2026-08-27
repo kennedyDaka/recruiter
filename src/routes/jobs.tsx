@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getPublicJobsFn } from "@/lib/jobs.functions";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 
@@ -20,16 +21,10 @@ export const Route = createFileRoute("/jobs")({
 });
 
 function JobsPage() {
+  const fetchJobs = useServerFn(getPublicJobsFn);
   const { data, isLoading } = useQuery({
     queryKey: ["public-jobs"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("campaigns")
-        .select("id, name, job_title, location, employment_type, closing_date, status")
-        .in("status", ["active", "closing_soon"])
-        .order("created_at", { ascending: false });
-      return data ?? [];
-    },
+    queryFn: () => fetchJobs(),
   });
 
   return (

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getTenantCampaignsFn } from "@/lib/campaigns.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,16 +27,10 @@ export const Route = createFileRoute("/_authenticated/campaigns/")({
 });
 
 function CampaignsPage() {
+  const fetchCampaigns = useServerFn(getTenantCampaignsFn);
   const { data, isLoading } = useQuery({
     queryKey: ["campaigns"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select("id, name, job_title, location, status, closing_date, min_experience_years")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchCampaigns(),
   });
 
   return (

@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Briefcase, FileCheck2, Star, Users } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getDashboardFn } from "@/lib/dashboard.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,25 +24,10 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
+  const fetchDashboard = useServerFn(getDashboardFn);
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
-    queryFn: async () => {
-      const [campaigns, applications] = await Promise.all([
-        supabase
-          .from("campaigns")
-          .select("id, name, job_title, status, closing_date, slug")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("applications")
-          .select("id, reference, score, recommendation, status, created_at, campaign_id")
-          .order("score", { ascending: false })
-          .limit(8),
-      ]);
-      return {
-        campaigns: campaigns.data ?? [],
-        applications: applications.data ?? [],
-      };
-    },
+    queryFn: () => fetchDashboard(),
   });
 
   const campaigns = data?.campaigns ?? [];

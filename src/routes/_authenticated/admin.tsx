@@ -5,8 +5,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { getCurrentSessionFn } from "@/lib/auth/session.functions";
+import { getAdminStatsFn } from "@/lib/admin.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,76 +42,10 @@ function AdminDashboard() {
 
   const isAdmin = (session as any)?.role === "super_admin";
 
+  const fetchStats = useServerFn(getAdminStatsFn);
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
-    queryFn: async () => {
-      const [
-        tenantsRes,
-        campaignsRes,
-        applicationsRes,
-        paymentsRes,
-        activeCampaignsRes,
-        incidentsRes,
-        usersRes,
-      ] = await Promise.all([
-        supabase.from("tenants").select("id, name, industry, country, created_at"),
-        supabase.from("campaigns").select("id, name, status, tenant_id, created_at"),
-        supabase.from("applications").select("id, score, status, created_at"),
-        supabase.from("payments").select("id, amount, currency, status, created_at"),
-        supabase.from("campaigns").select("id").eq("status", "active"),
-        supabase.from("incidents").select("id, status, priority"),
-        supabase.from("profiles").select("id, email, full_name, created_at"),
-      ]);
-
-      const tenants = tenantsRes.data ?? [];
-      const campaigns = campaignsRes.data ?? [];
-      const applications = applicationsRes.data ?? [];
-      const payments = paymentsRes.data ?? [];
-      const incidents = incidentsRes.data ?? [];
-      const users = usersRes.data ?? [];
-
-      const totalRevenue = payments
-        .filter((p) => p.status === "success")
-        .reduce((sum, p) => sum + (p.amount ?? 0), 0);
-
-      const avgScore = applications.length
-        ? Math.round(
-            applications.reduce((s, a) => s + (a.score ?? 0), 0) / applications.length,
-          )
-        : 0;
-
-      // Applications per day (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const recentApps = applications.filter(
-        (a) => new Date(a.created_at) > thirtyDaysAgo,
-      ).length;
-
-      // Incident breakdown
-      const openIncidents = incidents.filter(
-        (i) => !["resolved", "closed"].includes(i.status),
-      );
-      const criticalIncidents = openIncidents.filter(
-        (i) => i.priority === "critical",
-      );
-
-      return {
-        totalTenants: tenants.length,
-        totalCampaigns: campaigns.length,
-        activeCampaigns: activeCampaignsRes.data?.length ?? 0,
-        totalApplications: applications.length,
-        recentApplications: recentApps,
-        totalRevenue,
-        avgScore,
-        totalUsers: users.length,
-        openIncidents: openIncidents.length,
-        criticalIncidents: criticalIncidents.length,
-        tenants: tenants.slice(0, 10),
-        recentPayments: payments
-          .filter((p) => p.status === "success")
-          .slice(0, 5),
-      };
-    },
+    queryFn: () => fetchStats(),
     enabled: isAdmin,
   });
 

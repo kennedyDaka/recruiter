@@ -45,6 +45,11 @@ export const saveCampaignSchema = z.object({
   weights: z.record(z.string(), z.number()),
   questions: z.array(builderQuestionSchema).max(80).default([]),
   scoringModel: z.record(z.string(), z.unknown()).nullable().optional(),
+  // Branding
+  logoData: z.string().max(5_000_000).nullable().optional(),
+  brandColor: z.string().trim().max(20).default("#2563eb"),
+  brandFont: z.string().trim().max(60).default("Inter"),
+  companyName: z.string().trim().max(200).default(""),
 });
 
 export type SaveCampaignInput = z.infer<typeof saveCampaignSchema>;

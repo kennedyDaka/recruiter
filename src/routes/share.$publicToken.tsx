@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Logo } from "@/components/brand/Logo";
+import { useServerFn } from "@tanstack/react-start";
+import { getPublicCampaignFn } from "@/lib/apply-public.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -93,20 +93,10 @@ function ShareVacancyPage() {
   const { publicToken } = Route.useParams();
   const [copied, setCopied] = useState(false);
 
+  const fetchCampaign = useServerFn(getPublicCampaignFn);
   const { data: campaign, isLoading } = useQuery({
     queryKey: ["share-campaign", publicToken],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select(
-          "id, name, job_title, location, employment_type, job_description, responsibilities, required_skills, min_qualification, min_experience_years, salary_min, salary_max, salary_currency, closing_date, published_at, tenants(name, logo_url)",
-        )
-        .eq("public_token", publicToken)
-        .in("status", ["active", "paused"])
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchCampaign({ data: { token: publicToken } }),
   });
 
   // Update document meta tags dynamically when campaign loads
@@ -132,7 +122,7 @@ function ShareVacancyPage() {
     setMeta("property", "og:title", title);
     setMeta("property", "og:description", desc);
     setMeta("property", "og:type", "website");
-    setMeta("property", "og:site_name", "Operon Recruit");
+    setMeta("property", "og:site_name", (campaign as any)?.company_name || (campaign as any)?.tenants?.name || "Operon Recruit");
     setMeta("name", "description", desc);
     setMeta("name", "twitter:card", "summary");
     setMeta("name", "twitter:title", title);
@@ -197,7 +187,14 @@ function ShareVacancyPage() {
       {/* Header */}
       <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Logo />
+          <div className="flex items-center gap-3">
+            {((campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url) ? (
+              <img src={(campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url} alt="Logo" className="h-8 w-8 rounded object-contain" />
+            ) : null}
+            <span className="font-display font-semibold" style={{ color: (campaign as any)?.brand_color || '#1e293b' }}>
+              {(campaign as any)?.company_name || (campaign as any)?.tenants?.name || ''}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={copyLink}>
               {copied ? (
@@ -215,18 +212,18 @@ function ShareVacancyPage() {
         {/* Company & Job Title */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            {campaign.tenants?.logo_url && (
+            {((campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url) ? (
               <img
-                src={campaign.tenants.logo_url}
-                alt={campaign.tenants?.name || ""}
+                src={(campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url}
+                alt="Company logo"
                 className="h-12 w-12 rounded-lg object-contain border"
               />
-            )}
+            ) : null}
             <div>
               <h2 className="text-sm font-medium text-muted-foreground">
-                {campaign.tenants?.name || "Operon Recruit"}
+                {(campaign as any)?.company_name || (campaign as any)?.tenants?.name || ''}
               </h2>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold" style={{ color: (campaign as any)?.brand_color || undefined }}>
                 {campaign.job_title || campaign.name}
               </h1>
             </div>

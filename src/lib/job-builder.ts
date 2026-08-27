@@ -149,6 +149,16 @@ export type JobBuilder = {
   // v2 Requirement Groups
   /** Requirement groups for the new eligibility + scoring engine. */
   requirementGroups: import("@/lib/ors-requirements").RequirementGroup[];
+
+  // Branding
+  /** Company logo as a data URI (base64). */
+  logoData: string | null;
+  /** Primary brand color (hex). */
+  brandColor: string;
+  /** Brand font family. */
+  brandFont: string;
+  /** Company name displayed on the public application page. */
+  companyName: string;
 };
 
 export type ApplicationSection =
@@ -1440,5 +1450,10 @@ export function defaultBuilder(): JobBuilder {
   industry: "",
   // v2 Requirement Groups
   requirementGroups: [],
+  // Branding
+  logoData: null,
+  brandColor: "#2563eb",
+  brandFont: "Inter",
+  companyName: "",
 };
 }

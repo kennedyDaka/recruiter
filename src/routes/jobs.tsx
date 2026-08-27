@@ -50,15 +50,33 @@ function JobsPage() {
               key={job.id}
               className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-6 shadow-sm"
             >
-              <div>
-                <h2 className="font-display text-lg font-semibold">{job.job_title}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {[job.location, job.employment_type].filter(Boolean).join(" · ") ||
-                    "Details inside"}
-                  {job.closing_date ? ` · closes ${new Date(job.closing_date).toLocaleDateString()}` : ""}
-                </p>
+              <div className="flex items-center gap-4">
+                {(job.logo_data || job.tenants?.logo_url) ? (
+                  <img
+                    src={job.logo_data || job.tenants?.logo_url}
+                    alt="Company logo"
+                    className="size-12 rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="size-12 rounded-lg bg-secondary grid place-items-center text-xs font-medium text-muted-foreground">
+                    {(job.company_name || job.tenants?.name || '?').slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h2 className="font-display text-lg font-semibold" style={{ color: job.brand_color || undefined }}>
+                    {job.job_title}
+                  </h2>
+                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                    {job.company_name || job.tenants?.name || ''}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {[job.location, job.employment_type].filter(Boolean).join(" · ") ||
+                      "Details inside"}
+                    {job.closing_date ? ` · closes ${new Date(job.closing_date).toLocaleDateString()}` : ""}
+                  </p>
+                </div>
               </div>
-              <Button asChild>
+              <Button asChild style={{ backgroundColor: job.brand_color || undefined }}>
                 <Link to="/apply/$campaignId" params={{ campaignId: job.id }}>
                   Apply
                 </Link>

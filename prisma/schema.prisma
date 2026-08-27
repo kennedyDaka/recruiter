@@ -140,6 +140,11 @@ model Campaign {
   scoring_model        String?  // JSON: CampaignScoringModel with requirement groups
   competencies         String   @default("[]")
   referee_count        Int      @default(2)
+  logo_url             String?  // Company logo URL or data URI
+  logo_data            String?  // Base64-encoded logo stored in DB
+  brand_color          String?  @default("#2563eb") // Primary brand color
+  brand_font           String?  @default("Inter") // Brand font family
+  company_name         String?  // Company name displayed on application page
   status               String   @default("draft")
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt

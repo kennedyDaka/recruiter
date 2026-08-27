@@ -47,6 +47,10 @@ export const saveCampaignDraft = createServerFn({ method: "POST" })
       weights: data.weights as unknown as Json,
       builder: data.builder as unknown as Json,
       scoring_model: data.scoringModel ? JSON.stringify(data.scoringModel) : null,
+      logo_data: data.logoData ?? null,
+      brand_color: data.brandColor || "#2563eb",
+      brand_font: data.brandFont || "Inter",
+      company_name: data.companyName || null,
       status: "draft" as const,
     };
 

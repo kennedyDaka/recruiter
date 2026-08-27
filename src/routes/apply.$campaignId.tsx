@@ -35,7 +35,7 @@ import { searchCertificationCatalog, type CertificationEntry } from "@/lib/certi
 import { APPLICANT_COUNTRIES, CITIES_BY_COUNTRY, DIAL_CODES, FIELDS_OF_STUDY } from "@/lib/applicant-catalog";
 import { FALLBACK_FAMILIES, FALLBACK_SKILLS } from "@/lib/recruitment-catalog";
 import { QUALIFICATION_LEVELS, yearsFromExperience } from "@/lib/ors";
-import { Logo } from "@/components/brand/Logo";
+import { getPublicCampaignFn } from "@/lib/apply-public.functions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -71,6 +71,13 @@ type Recruiter = {
   settings: string | null;
 } | null;
 
+type CampaignBranding = {
+  logo_data: string | null;
+  brand_color: string | null;
+  brand_font: string | null;
+  company_name: string | null;
+} | null;
+
 type CampaignSummary = {
   id: string;
   name: string | null;
@@ -93,6 +100,10 @@ type CampaignSummary = {
   status: string | null;
   published_at: string | null;
   tenants: Recruiter;
+  logo_data: string | null;
+  brand_color: string | null;
+  brand_font: string | null;
+  company_name: string | null;
 };
 
 type Question = {
@@ -584,34 +595,11 @@ function ApplyPage() {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
+  const fetchCampaign = useServerFn(getPublicCampaignFn);
   const { data: campaign, isLoading } = useQuery({
     queryKey: ["apply-campaign", campaignId],
     queryFn: async () => {
-      // The URL parameter is a public_token (e.g. "pub-abc123") or a campaign UUID.
-      // Try public_token first, then fall back to id lookup.
-      let { data, error } = await supabase
-        .from("campaigns")
-        .select(
-          "id, name, job_title, location, employment_type, job_description, responsibilities, required_skills, required_certifications, required_documents, min_qualification, min_experience_years, salary_min, salary_max, salary_currency, start_date, closing_date, referee_count, builder, status, published_at, tenants(name, logo_url, settings)",
-        )
-        .eq("public_token", campaignId)
-        .maybeSingle();
-
-      if (!data) {
-        // Fallback: maybe the URL contains the actual campaign UUID
-        const byId = await supabase
-          .from("campaigns")
-          .select(
-            "id, name, job_title, location, employment_type, job_description, responsibilities, required_skills, required_certifications, required_documents, min_qualification, min_experience_years, salary_min, salary_max, salary_currency, start_date, closing_date, referee_count, builder, status, published_at, tenants(name, logo_url, settings)",
-          )
-          .eq("id", campaignId)
-          .maybeSingle();
-        data = byId.data;
-        error = byId.error;
-      }
-
-      if (error) throw error;
-      const raw = data as unknown as CampaignSummary | null;
+      const raw = await fetchCampaign({ data: { token: campaignId } }) as unknown as CampaignSummary | null;
       if (!raw) return null;
       // JSON-list columns are stored as strings; normalize them to arrays.
       return {
@@ -818,8 +806,8 @@ function ApplyPage() {
       ...(campaign.closing_date ? { validThrough: campaign.closing_date } : {}),
       hiringOrganization: {
         "@type": "Organization",
-        name: campaign.tenants?.name ?? "Operon Recruit",
-        ...(campaign.tenants?.logo_url ? { logo: campaign.tenants.logo_url } : {}),
+        name: campaign.company_name || campaign.tenants?.name || "",
+        ...(campaign.logo_data ? { logo: campaign.logo_data } : campaign.tenants?.logo_url ? { logo: campaign.tenants.logo_url } : {}),
         sameAs: typeof window !== "undefined" ? window.location.origin : undefined,
       },
       jobLocation: {
@@ -1225,11 +1213,17 @@ function ApplyPage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jobPostingLd) }}
         />
       ) : null}
-      <header className="border-b border-border/60 bg-background">
+      <header className="border-b border-border/60" style={{ backgroundColor: 'white' }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link to="/">
-            <Logo />
-          </Link>
+          <div className="flex items-center gap-3">
+            {campaign?.logo_data ? (
+              <img src={campaign.logo_data} alt="Company logo" className="h-10 w-10 rounded object-contain" />
+            ) : campaign?.tenants?.logo_url ? (
+              <img src={campaign.tenants.logo_url} alt="Company logo" className="h-10 w-10 rounded object-contain" />
+            ) : null}
+            <span className="font-display text-lg font-semibold" style={{ color: campaign?.brand_color || '#1e293b', fontFamily: campaign?.brand_font || 'Inter' }}>
+              {campaign?.company_name || campaign?.tenants?.name || 'Apply'}</span>
+          </div>
           <Link to="/jobs" className="text-sm text-muted-foreground hover:text-foreground">
             All roles
           </Link>

@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedCandidatesRouteImport } from './routes/_authenticated/candidates'
 import { Route as AuthenticatedContactCenterRouteImport } from './routes/_authenticated/contact-center'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -39,6 +40,7 @@ import { Route as ApiCampaignsCampaignIdRouteImport } from './routes/api/campaig
 import { Route as ApiCatalogsUniversitiesRouteImport } from './routes/api/catalogs/universities'
 import { Route as ApiPaymentInitiateRouteImport } from './routes/api/payment/initiate'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
+import { Route as ApiPublicJobsRouteImport } from './routes/api/public/jobs'
 import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './routes/_authenticated/campaigns.$campaignId.index'
 import { Route as AuthenticatedCampaignsCampaignIdExtendRouteImport } from './routes/_authenticated/campaigns.$campaignId.extend'
 import { Route as AuthenticatedCampaignsCampaignIdPayRouteImport } from './routes/_authenticated/campaigns.$campaignId.pay'
@@ -75,6 +77,11 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedCandidatesRoute = AuthenticatedCandidatesRouteImport.update({
   id: '/candidates',
@@ -201,6 +208,11 @@ const ApiPaymentWebhookRoute = ApiPaymentWebhookRouteImport.update({
   path: '/api/payment/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsRoute = ApiPublicJobsRouteImport.update({
+  id: '/api/public/jobs',
+  path: '/api/public/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedCampaignsCampaignIdIndexRoute =
   AuthenticatedCampaignsCampaignIdIndexRouteImport.update({
     id: '/',
@@ -247,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/candidates': typeof AuthenticatedCandidatesRoute
   '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -270,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/public/jobs': typeof ApiPublicJobsRoute
   '/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
@@ -285,6 +299,7 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/candidates': typeof AuthenticatedCandidatesRoute
   '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -307,6 +322,7 @@ export interface FileRoutesByTo {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/public/jobs': typeof ApiPublicJobsRoute
   '/campaigns': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
@@ -324,6 +340,7 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/candidates': typeof AuthenticatedCandidatesRoute
   '/_authenticated/contact-center': typeof AuthenticatedContactCenterRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -347,6 +364,7 @@ export interface FileRoutesById {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/public/jobs': typeof ApiPublicJobsRoute
   '/_authenticated/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/_authenticated/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/_authenticated/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
@@ -364,6 +382,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/reset-password'
     | '/verify-email'
+    | '/admin'
     | '/candidates'
     | '/contact-center'
     | '/dashboard'
@@ -387,6 +406,7 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/public/jobs'
     | '/campaigns/'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
@@ -402,6 +422,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/reset-password'
     | '/verify-email'
+    | '/admin'
     | '/candidates'
     | '/contact-center'
     | '/dashboard'
@@ -424,6 +445,7 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/public/jobs'
     | '/campaigns'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
@@ -440,6 +462,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/reset-password'
     | '/verify-email'
+    | '/_authenticated/admin'
     | '/_authenticated/candidates'
     | '/_authenticated/contact-center'
     | '/_authenticated/dashboard'
@@ -463,6 +486,7 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/public/jobs'
     | '/_authenticated/campaigns/'
     | '/_authenticated/campaigns/$campaignId/extend'
     | '/_authenticated/campaigns/$campaignId/pay'
@@ -493,6 +517,7 @@ export interface RootRouteChildren {
   ApiCatalogsUniversitiesRoute: typeof ApiCatalogsUniversitiesRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
+  ApiPublicJobsRoute: typeof ApiPublicJobsRoute
   ApiPaymentStatusTxRefRoute: typeof ApiPaymentStatusTxRefRoute
   ApiPaymentStatusCampaignCampaignIdRoute: typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
@@ -540,6 +565,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/verify-email'
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/candidates': {
       id: '/_authenticated/candidates'
@@ -709,6 +741,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs': {
+      id: '/api/public/jobs'
+      path: '/api/public/jobs'
+      fullPath: '/api/public/jobs'
+      preLoaderRoute: typeof ApiPublicJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/campaigns/$campaignId/': {
       id: '/_authenticated/campaigns/$campaignId/'
       path: '/'
@@ -783,6 +822,7 @@ const AuthenticatedCampaignsCampaignIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCandidatesRoute: typeof AuthenticatedCandidatesRoute
   AuthenticatedContactCenterRoute: typeof AuthenticatedContactCenterRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -797,6 +837,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCandidatesRoute: AuthenticatedCandidatesRoute,
   AuthenticatedContactCenterRoute: AuthenticatedContactCenterRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -859,6 +900,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCatalogsUniversitiesRoute: ApiCatalogsUniversitiesRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,
+  ApiPublicJobsRoute: ApiPublicJobsRoute,
   ApiPaymentStatusTxRefRoute: ApiPaymentStatusTxRefRoute,
   ApiPaymentStatusCampaignCampaignIdRoute:
     ApiPaymentStatusCampaignCampaignIdRoute,

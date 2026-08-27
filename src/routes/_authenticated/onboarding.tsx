@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Building2, Check, ChevronsUpDown, Globe, LogOut, Phone } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, Globe, LogOut, Phone, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { registerCompany } from "@/lib/registration.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { FALLBACK_INDUSTRIES } from "@/lib/recruitment-catalog";
 import { COUNTRIES } from "@/lib/job-builder";
+import { extractBrandColor, generateBrandTheme } from "@/lib/color-extraction"
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
@@ -135,6 +136,11 @@ function CompanyOnboarding() {
   const navigate = useNavigate();
   const register = useServerFn(registerCompany);
   const [industryOpen, setIndustryOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [extractedColor, setExtractedColor] = useState("#2563eb");
+  const [brandFont, setBrandFont] = useState("Inter");
+  const [logoPreview, setLogoPreview] = useState("");
   const [form, setForm] = useState({
     companyName: "",
     industry: "",
@@ -196,13 +202,40 @@ function CompanyOnboarding() {
   // Selected currency
   const selectedCurrency = form.country ? CURRENCY_MAP[form.country] : null;
 
+  // Handle logo upload — reads as base64 data URL, extracts brand color
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo must be 5 MB or smaller.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
+      setLogoDataUrl(dataUrl);
+      setLogoPreview(dataUrl);
+      const color = await extractBrandColor(dataUrl);
+      setExtractedColor(color);
+      toast.success(`Logo uploaded! Detected brand color: ${color}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoDataUrl("");
+    setLogoPreview("");
+    setExtractedColor("#2563eb");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const saveWorkspace = useMutation<
     { tenantId: string; created: boolean; token?: string },
     Error,
     void
   >({
     mutationFn: async () => {
-      const result = (await register({ data: { ...form, phone: fullPhone } })) as {
+      const result = (await register({ data: { ...form, phone: fullPhone, logoData: logoDataUrl, brandColor: extractedColor, brandFont } })) as {
         tenantId: string;
         created: boolean;
         token?: string;
@@ -282,6 +315,97 @@ function CompanyOnboarding() {
                   required
                 />
               </Field>
+
+              {/* Company logo — auto color extraction */}
+              <Field label="Company logo" htmlFor="logo-upload">
+                <input
+                  ref={fileInputRef}
+                  id="logo-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                />
+                {logoPreview ? (
+                  <div className="relative">
+                    <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                      <img
+                        src={logoPreview}
+                        alt="Company logo"
+                        className="h-14 w-14 rounded-md object-contain border border-border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">Logo uploaded</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Brand color:</span>
+                          <span
+                            className="inline-block h-4 w-4 rounded-full border border-border"
+                            style={{ backgroundColor: extractedColor }}
+                          />
+                          <span className="font-mono text-xs">{extractedColor}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Font:</span>
+                          <select
+                            value={brandFont}
+                            onChange={(e) => setBrandFont(e.target.value)}
+                            className="rounded border border-input bg-background px-1.5 py-0.5 text-xs"
+                          >
+                            {['Inter','Poppins','DM Sans','Space Grotesk','Lato','Open Sans','Nunito','Source Sans 3','Playfair Display'].map(f => (
+                              <option key={f} value={f}>{f}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={removeLogo} className="shrink-0">
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/20 p-6 text-center hover:border-primary/50 hover:bg-secondary/40 transition-colors"
+                  >
+                    <Upload className="size-8 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Upload company logo</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        PNG, JPG, SVG or WebP. Max 5 MB. Brand color is auto-detected.
+                      </p>
+                    </div>
+                  </button>
+                )}
+              </Field>
+
+              {/* Brand preview */}
+              {logoPreview && (
+                <Field label="Brand preview" htmlFor="brand-preview">
+                  <div
+                    id="brand-preview"
+                    className="rounded-lg border border-border p-4"
+                    style={generateBrandTheme(extractedColor)}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <img src={logoPreview} alt="Logo" className="h-8 w-8 rounded object-contain" />
+                      <span
+                        className="text-base font-semibold"
+                        style={{ color: extractedColor, fontFamily: brandFont }}
+                      >
+                        {form.companyName || "Company Name"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md px-4 py-2 text-sm font-medium text-white"
+                      style={{ backgroundColor: extractedColor, fontFamily: brandFont }}
+                    >
+                      Apply Now
+                    </button>
+                  </div>
+                </Field>
+              )}
 
               {/* Industry — searchable */}
               <Field label="Industry" htmlFor="industry">

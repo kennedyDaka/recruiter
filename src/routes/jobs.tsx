@@ -51,23 +51,23 @@ function JobsPage() {
               className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-6 shadow-sm"
             >
               <div className="flex items-center gap-4">
-                {(job.logo_data || job.tenants?.logo_url) ? (
+                {(job.tenants?.logo_data || job.tenants?.logo_url) ? (
                   <img
-                    src={job.logo_data || job.tenants?.logo_url}
+                    src={job.tenants?.logo_data || job.tenants?.logo_url}
                     alt="Company logo"
                     className="size-12 rounded-lg object-contain"
                   />
                 ) : (
                   <div className="size-12 rounded-lg bg-secondary grid place-items-center text-xs font-medium text-muted-foreground">
-                    {(job.company_name || job.tenants?.name || '?').slice(0, 2).toUpperCase()}
+                    {(job.tenants?.name || '?').slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <h2 className="font-display text-lg font-semibold" style={{ color: job.brand_color || undefined }}>
+                  <h2 className="font-display text-lg font-semibold" style={{ color: job.tenants?.brand_color || '#1e293b' }}>
                     {job.job_title}
                   </h2>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    {job.company_name || job.tenants?.name || ''}
+                    {job.tenants?.name || ''}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {[job.location, job.employment_type].filter(Boolean).join(" · ") ||
@@ -76,7 +76,7 @@ function JobsPage() {
                   </p>
                 </div>
               </div>
-              <Button asChild style={{ backgroundColor: job.brand_color || undefined }}>
+              <Button asChild style={{ backgroundColor: job.tenants?.brand_color || '#2563eb', color: '#fff' }}>
                 <Link to="/apply/$campaignId" params={{ campaignId: job.id }}>
                   Apply
                 </Link>

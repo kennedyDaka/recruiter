@@ -3,7 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { FileText, Globe2, Mail, MessageCircle, RotateCcw, Send, Zap } from "lucide-react";
+import { FileText, Globe2, Mail, MessageCircle, Paintbrush, RotateCcw, Send, Upload, Zap } from "lucide-react";
+import { getTenantBrandingFn, updateTenantBrandingFn } from "@/lib/branding.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -282,6 +283,9 @@ function SettingsPage() {
             </div>
           ) : null}
         </section>
+
+        {/* ── Company Branding ──────────────────────────────────────── */}
+        <BrandingSection queryClient={queryClient} />
 
         {/* ── Email integration ─────────────────────────────────────── */}
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -652,5 +656,144 @@ function SettingsPage() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+function BrandingSection({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const getBranding = useServerFn(getTenantBrandingFn);
+  const updateBranding = useServerFn(updateTenantBrandingFn);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [brandColor, setBrandColor] = useState("#2563eb");
+  const [brandFont, setBrandFont] = useState("Inter");
+  const [companyName, setCompanyName] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    getBranding().then((data: any) => {
+      if (data) {
+        setLogoPreview(data.logoData || "");
+        setBrandColor(data.brandColor || "#2563eb");
+        setBrandFont(data.brandFont || "Inter");
+        setCompanyName(data.name || "");
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo must be 5 MB or smaller.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setLogoPreview(dataUrl);
+      const { extractBrandColor } = await import("@/lib/color-extraction");
+      const color = await extractBrandColor(dataUrl);
+      setBrandColor(color);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    await updateBranding({
+      data: { logoData: logoPreview, brandColor, brandFont, companyName },
+    });
+    toast.success("Branding updated");
+    queryClient.invalidateQueries();
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <Paintbrush className="size-5" />
+        </div>
+        <div className="flex-1">
+          <h2 className="font-display text-base font-semibold">Company Branding</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Your logo, brand color and font are used on application pages, vacancy links, and candidate communications.
+          </p>
+
+          <div className="mt-6 space-y-5">
+            {/* Company name */}
+            <div className="grid gap-2">
+              <Label>Company Name</Label>
+              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Acme Corporation" />
+            </div>
+
+            {/* Logo */}
+            <div className="grid gap-2">
+              <Label>Company Logo</Label>
+              <div className="flex items-center gap-4">
+                {logoPreview ? (
+                  <div className="relative">
+                    <img src={logoPreview} alt="Logo" className="h-20 w-20 rounded-lg border border-border object-contain" />
+                    <button type="button" className="absolute -top-2 -right-2 size-6 rounded-full bg-destructive text-white text-xs" onClick={() => setLogoPreview("")}>
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors">
+                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={handleLogoUpload} />
+                    <Upload className="size-6 text-muted-foreground" />
+                    <span className="mt-1 text-[10px] text-muted-foreground">Upload</span>
+                  </label>
+                )}
+                <div className="text-xs text-muted-foreground">
+                  <p>Brand color is auto-detected from your logo.</p>
+                  <p>PNG, JPG, SVG or WebP. Max 5 MB.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Brand color */}
+            <div className="grid gap-2">
+              <Label>Brand Color (auto-detected)</Label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="size-10 cursor-pointer rounded border border-border" />
+                <Input className="w-32" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Brand font */}
+            <div className="grid gap-2">
+              <Label>Brand Font</Label>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {["Inter", "Poppins", "DM Sans", "Space Grotesk", "Lato", "Open Sans", "Nunito", "Source Sans 3", "Playfair Display"].map((font) => (
+                  <button
+                    key={font}
+                    type="button"
+                    className={`rounded-lg border p-2 text-left text-xs transition-colors ${brandFont === font ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}
+                    onClick={() => setBrandFont(font)}
+                  >
+                    <span style={{ fontFamily: font }}>{font}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-2">Preview</p>
+              <div className="flex items-center gap-3">
+                {logoPreview && <img src={logoPreview} alt="Logo" className="h-8 w-8 rounded object-contain" />}
+                <span className="text-base font-semibold" style={{ color: brandColor, fontFamily: brandFont }}>{companyName || "Company Name"}</span>
+              </div>
+              <button type="button" className="mt-3 rounded-md px-4 py-2 text-sm font-medium text-white" style={{ backgroundColor: brandColor, fontFamily: brandFont }}>
+                Apply Now
+              </button>
+            </div>
+
+            <Button onClick={save}>Save Branding</Button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

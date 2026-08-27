@@ -84,7 +84,7 @@ const STEPS = [
   "Conditions",
   "Questions",
   "Scoring",
-  "Branding",
+  "Brand Preview",
   "Publish",
 ];
 
@@ -2027,153 +2027,21 @@ export function CampaignWizard() {
         {step === 7 ? (
           <div className="space-y-6">
             <div>
-              <h3 className="font-display text-base font-semibold">Branding</h3>
+              <h3 className="font-display text-base font-semibold">Company Branding</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Upload your company logo and set the brand color and font for the public application page.
-                This is what candidates will see when they apply.
+                Your company branding (logo, colors, font) is set during registration and will be
+                displayed on the application page. You can update it in Settings.
               </p>
             </div>
-
-            {/* Company Name */}
-            <div>
-              <Label>Company Name</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. Acme Corporation"
-                value={builder.companyName}
-                onChange={(e) => patch({ companyName: e.target.value })}
-              />
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-medium text-foreground">
+                Branding is managed from your company profile.
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Displayed on the application page and in candidate communications.
+                The application page, vacancy links, and candidate communications will automatically
+                use your company logo, brand color, and font. Go to{' '}
+                <a href="/settings" className="text-primary underline">Settings</a> to update.
               </p>
-            </div>
-
-            {/* Logo Upload */}
-            <div>
-              <Label>Company Logo</Label>
-              <p className="mt-1 text-xs text-muted-foreground mb-3">
-                Recommended: 200×200px, PNG or SVG with transparent background.
-              </p>
-              <div className="flex items-center gap-4">
-                {builder.logoData ? (
-                  <div className="relative">
-                    <img
-                      src={builder.logoData}
-                      alt="Company logo"
-                      className="h-20 w-20 rounded-lg border border-border object-contain"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute -top-2 -right-2 size-6 rounded-full p-0"
-                      onClick={() => patch({ logoData: null })}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ) : (
-                  <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors">
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => patch({ logoData: reader.result as string });
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                    <svg className="size-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    <span className="mt-1 text-[10px] text-muted-foreground">Upload</span>
-                  </label>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  {builder.logoData ? (
-                    <p>Logo uploaded. Click × to remove.</p>
-                  ) : (
-                    <p>Click the box to upload your company logo.<br />This will appear on the application page.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Brand Color */}
-            <div>
-              <Label>Brand Color</Label>
-              <p className="mt-1 text-xs text-muted-foreground mb-3">
-                This color will be used for buttons, headers, and accents on the application page.
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={builder.brandColor}
-                  onChange={(e) => patch({ brandColor: e.target.value })}
-                  className="size-10 cursor-pointer rounded border border-border"
-                />
-                <Input
-                  className="w-32"
-                  value={builder.brandColor}
-                  onChange={(e) => patch({ brandColor: e.target.value })}
-                  placeholder="#2563eb"
-                />
-                <div className="flex gap-2">
-                  {["#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#1e293b"].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className="size-6 rounded-full border-2 border-white shadow"
-                      style={{ backgroundColor: color }}
-                      onClick={() => patch({ brandColor: color })}
-                    />
-                  ))}
-                </div>
-              </div>
-              {/* Live preview */}
-              <div className="mt-4 rounded-lg border border-border p-4">
-                <p className="text-xs text-muted-foreground mb-2">Preview</p>
-                <div className="flex items-center gap-3">
-                  {builder.logoData && (
-                    <img src={builder.logoData} alt="Logo" className="size-8 rounded object-contain" />
-                  )}
-                  <span className="font-semibold" style={{ color: builder.brandColor }}>
-                    {builder.companyName || "Company Name"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="mt-3 rounded-md px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: builder.brandColor }}
-                >
-                  Apply Now
-                </button>
-              </div>
-            </div>
-
-            {/* Brand Font */}
-            <div>
-              <Label>Brand Font</Label>
-              <p className="mt-1 text-xs text-muted-foreground mb-3">
-                The font used on the public application page.
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {["Inter", "Poppins", "DM Sans", "Space Grotesk", "Lato", "Open Sans", "Nunito", "Source Sans 3", "Playfair Display"].map((font) => (
-                  <button
-                    key={font}
-                    type="button"
-                    className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-                      builder.brandFont === font
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/30"
-                    }`}
-                    onClick={() => patch({ brandFont: font })}
-                  >
-                    <span style={{ fontFamily: font }}>{font}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         ) : null}

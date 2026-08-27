@@ -10,15 +10,15 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { dbQueryFirst } = await import("@/lib/db");
 
-    // Try public_token first, then fall back to id
+    // Try public_token first, then fall back to id — fetch tenant-level branding
     let campaign = await dbQueryFirst(
       `SELECT c.id, c.name, c.job_title, c.location, c.employment_type,
               c.job_description, c.responsibilities, c.required_skills,
               c.required_certifications, c.required_documents, c.min_qualification,
               c.min_experience_years, c.salary_min, c.salary_max, c.salary_currency,
               c.start_date, c.closing_date, c.referee_count, c.status, c.published_at,
-              c.logo_data, c.brand_color, c.brand_font, c.company_name,
-              t.name as tenant_name, t.logo_url as tenant_logo_url, t.settings as tenant_settings
+              t.name as tenant_name, t.logo_url as tenant_logo_url, t.settings as tenant_settings,
+              t.logo_data as tenant_logo_data, t.brand_color as tenant_brand_color, t.brand_font as tenant_brand_font
        FROM campaigns c
        LEFT JOIN tenants t ON c.tenant_id = t.id
        WHERE c.public_token = $1 AND c.status IN ('active', 'closing_soon')`,
@@ -32,8 +32,8 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
                 c.required_certifications, c.required_documents, c.min_qualification,
                 c.min_experience_years, c.salary_min, c.salary_max, c.salary_currency,
                 c.start_date, c.closing_date, c.referee_count, c.status, c.published_at,
-                c.logo_data, c.brand_color, c.brand_font, c.company_name,
-                t.name as tenant_name, t.logo_url as tenant_logo_url, t.settings as tenant_settings
+                t.name as tenant_name, t.logo_url as tenant_logo_url, t.settings as tenant_settings,
+                t.logo_data as tenant_logo_data, t.brand_color as tenant_brand_color, t.brand_font as tenant_brand_font
          FROM campaigns c
          LEFT JOIN tenants t ON c.tenant_id = t.id
          WHERE c.id = $1 AND c.status IN ('active', 'closing_soon')`,
@@ -42,6 +42,11 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
     }
 
     if (!campaign) return null;
+
+    // Tenant-level branding is the source of truth
+    const logoData = campaign.tenant_logo_data || campaign.tenant_logo_url || null;
+    const brandColor = campaign.tenant_brand_color || '#2563eb';
+    const brandFont = campaign.tenant_brand_font || 'Inter';
 
     return {
       id: campaign.id,
@@ -64,10 +69,10 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
       referee_count: campaign.referee_count,
       status: campaign.status,
       published_at: campaign.published_at,
-      logo_data: campaign.logo_data,
-      brand_color: campaign.brand_color,
-      brand_font: campaign.brand_font,
-      company_name: campaign.company_name,
+      logo_data: logoData,
+      brand_color: brandColor,
+      brand_font: brandFont,
+      company_name: campaign.tenant_name,
       tenants: {
         name: campaign.tenant_name,
         logo_url: campaign.tenant_logo_url,

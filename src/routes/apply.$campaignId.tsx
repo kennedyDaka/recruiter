@@ -35,6 +35,7 @@ import { searchCertificationCatalog, type CertificationEntry } from "@/lib/certi
 import { APPLICANT_COUNTRIES, CITIES_BY_COUNTRY, DIAL_CODES, FIELDS_OF_STUDY } from "@/lib/applicant-catalog";
 import { FALLBACK_FAMILIES, FALLBACK_SKILLS } from "@/lib/recruitment-catalog";
 import { QUALIFICATION_LEVELS, yearsFromExperience } from "@/lib/ors";
+import { generateBrandTheme } from "@/lib/color-extraction";
 import { getPublicCampaignFn } from "@/lib/apply-public.functions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -763,6 +764,17 @@ function ApplyPage() {
   );
   const citySuggestions = CITIES_BY_COUNTRY[form.country] ?? [];
 
+  // Full-page brand theme extracted from tenant logo
+  const brandTheme = useMemo(() => {
+    const color = campaign?.brand_color || '#2563eb';
+    return generateBrandTheme(color);
+  }, [campaign?.brand_color]);
+
+  const brandColor = campaign?.brand_color || '#2563eb';
+  const brandFont = campaign?.brand_font || 'Inter';
+  const companyLogo = campaign?.logo_data || null;
+  const companyName = campaign?.company_name || campaign?.tenants?.name || '';
+
   // Google Jobs structured data — emitted only for live campaigns whose
   // tenant left Google distribution enabled (default on).
   const jobPostingLd = useMemo(() => {
@@ -1206,25 +1218,23 @@ function ApplyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-secondary/30">
+    <div className="min-h-screen" style={{ ...brandTheme, backgroundColor: 'var(--brand-bg-secondary)', fontFamily: brandFont }}>
       {jobPostingLd ? (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jobPostingLd) }}
         />
       ) : null}
-      <header className="border-b border-border/60" style={{ backgroundColor: 'white' }}>
+      <header className="border-b" style={{ backgroundColor: brandColor, borderColor: 'var(--brand-border)' }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            {campaign?.logo_data ? (
-              <img src={campaign.logo_data} alt="Company logo" className="h-10 w-10 rounded object-contain" />
-            ) : campaign?.tenants?.logo_url ? (
-              <img src={campaign.tenants.logo_url} alt="Company logo" className="h-10 w-10 rounded object-contain" />
+            {companyLogo ? (
+              <img src={companyLogo} alt="Company logo" className="h-10 w-10 rounded object-contain bg-white/20 p-0.5" />
             ) : null}
-            <span className="font-display text-lg font-semibold" style={{ color: campaign?.brand_color || '#1e293b', fontFamily: campaign?.brand_font || 'Inter' }}>
-              {campaign?.company_name || campaign?.tenants?.name || 'Apply'}</span>
+            <span className="font-display text-lg font-semibold text-white">
+              {companyName || 'Apply'}</span>
           </div>
-          <Link to="/jobs" className="text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/jobs" className="text-sm text-white/80 hover:text-white">
             All roles
           </Link>
         </div>
@@ -1252,12 +1262,14 @@ function ApplyPage() {
             onApply={startApplication}
             savedDraft={savedDraft}
             onResume={resumeApplication}
+            brandColor={brandColor}
+            brandFont={brandFont}
           />
         ) : (
           <>
             <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                <RecruiterBrand recruiter={campaign?.tenants ?? null} compact />
+                <RecruiterBrand recruiter={campaign?.tenants ?? null} compact logoData={companyLogo} brandColor={brandColor} />
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Application wizard
@@ -1290,7 +1302,7 @@ function ApplyPage() {
                 else continueApplication();
               }}
             >
-              <ApplicationProgress steps={applicationSteps} activeStep={wizardStep} />
+              <ApplicationProgress steps={applicationSteps} activeStep={wizardStep} brandColor={brandColor} />
 
               {currentStep === "contact" ? (
                 <>
@@ -2180,10 +2192,19 @@ function ApplyPage() {
 function ApplicationProgress({
   steps,
   activeStep,
+  brandColor = '#2563eb',
 }: {
   steps: { id: ApplicationStep; label: string }[];
   activeStep: number;
+  brandColor?: string;
 }) {
+  const isLight = (c: string) => {
+    const r = parseInt(c.slice(1,3), 16);
+    const g = parseInt(c.slice(3,5), 16);
+    const b = parseInt(c.slice(5,7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  };
+  const textColor = isLight(brandColor) ? '#1e293b' : '#ffffff';
   return (
     <nav aria-label="Application progress" className="overflow-x-auto pb-1">
       <ol className="flex min-w-max items-center gap-2">
@@ -2192,10 +2213,17 @@ function ApplicationProgress({
           const active = index === activeStep;
           return (
             <li key={step.id} className="flex items-center gap-2">
-              {index > 0 ? <span className="h-px w-6 bg-border sm:w-10" /> : null}
+              {index > 0 ? <span className="h-px w-6 sm:w-10" style={{ backgroundColor: brandColor + '40' }} /> : null}
               <span
                 aria-current={active ? "step" : undefined}
-                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${active ? "border-primary bg-primary text-primary-foreground" : complete ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}
+                className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium"
+                style={
+                  active
+                    ? { backgroundColor: brandColor, color: textColor, borderColor: brandColor }
+                    : complete
+                    ? { backgroundColor: brandColor + '15', color: brandColor, borderColor: brandColor + '30' }
+                    : { borderColor: '#e2e8f0', backgroundColor: '#ffffff', color: '#64748b' }
+                }
               >
                 {complete ? <CheckCircle2 className="h-4 w-4" /> : <span>{index + 1}</span>}
                 {step.label}
@@ -2376,6 +2404,8 @@ function VacancyOverview({
   onApply,
   savedDraft,
   onResume,
+  brandColor = '#2563eb',
+  brandFont = 'Inter',
 }: {
   campaign: CampaignSummary | null;
   isLoading: boolean;
@@ -2383,7 +2413,10 @@ function VacancyOverview({
   onApply: () => void;
   savedDraft: ApplicationDraft | null;
   onResume: () => void;
+  brandColor?: string;
+  brandFont?: string;
 }) {
+  const companyLogo = campaign?.logo_data || campaign?.tenants?.logo_url || null;
   const responsibilities = campaign?.responsibilities?.filter(Boolean) ?? [];
   const requiredSkills = campaign?.required_skills?.filter(Boolean) ?? [];
   const requiredCertifications = campaign?.required_certifications?.filter(Boolean) ?? [];
@@ -2414,18 +2447,18 @@ function VacancyOverview({
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <RecruiterBrand recruiter={campaign.tenants} />
+            <RecruiterBrand recruiter={campaign.tenants} logoData={companyLogo} brandColor={brandColor} />
             <p className="mt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Open vacancy
             </p>
-            <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl" style={{ color: brandColor }}>
               {campaign.job_title ?? campaign.name ?? "Open role"}
             </h1>
             {campaign.name && campaign.name !== campaign.job_title ? (
               <p className="mt-2 text-sm text-muted-foreground">{campaign.name}</p>
             ) : null}
           </div>
-          <Button type="button" size="lg" onClick={onApply}>
+          <Button type="button" size="lg" onClick={onApply} style={{ backgroundColor: brandColor, color: '#fff', borderColor: brandColor }}>
             Apply now
           </Button>
         </div>
@@ -2460,7 +2493,7 @@ function VacancyOverview({
               Progress from {formatDateTime(savedDraft.saved_at)} is available on this device.
             </p>
           </div>
-          <Button type="button" onClick={onResume}>
+          <Button type="button" onClick={onResume} style={{ backgroundColor: brandColor, color: '#fff', borderColor: brandColor }}>
             Resume application
           </Button>
         </section>
@@ -2514,7 +2547,7 @@ function VacancyOverview({
           <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
             <h2 className="font-display text-base font-semibold">Vacancy summary</h2>
             <dl className="mt-4 space-y-3 text-sm">
-              <SummaryRow label="Recruiter" value={campaign.tenants?.name ?? null} />
+              <SummaryRow label="Company" value={campaign.tenants?.name ?? null} />
               <SummaryRow
                 label="Experience"
                 value={formatExperience(campaign.min_experience_years)}
@@ -2522,7 +2555,7 @@ function VacancyOverview({
               <SummaryRow label="Salary" value={formatSalary(campaign)} />
               <SummaryRow label="Closes" value={formatDate(campaign.closing_date)} />
             </dl>
-            <Button type="button" className="mt-5 w-full" onClick={onApply}>
+            <Button type="button" className="mt-5 w-full" onClick={onApply} style={{ backgroundColor: brandColor, color: '#fff', borderColor: brandColor }}>
               Apply
             </Button>
           </section>
@@ -2552,31 +2585,37 @@ function VacancyOverview({
 function RecruiterBrand({
   recruiter,
   compact = false,
+  logoData,
+  brandColor,
 }: {
   recruiter: Recruiter;
   compact?: boolean;
+  logoData?: string | null;
+  brandColor?: string | null;
 }) {
   const name = recruiter?.name || "Recruiting organisation";
+  const logo = logoData || recruiter?.logo_url || null;
+  const color = brandColor || '#2563eb';
   return (
     <div className="flex items-center gap-3">
       <div
-        className={`${compact ? "size-11" : "size-14"} grid shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-secondary text-sm font-semibold text-muted-foreground`}
+        className={`${compact ? "size-11" : "size-14"} grid shrink-0 place-items-center overflow-hidden rounded-md border text-sm font-semibold`}
+        style={{ borderColor: color + '40', backgroundColor: color + '10' }}
       >
-        {recruiter?.logo_url ? (
+        {logo ? (
           <img
-            src={recruiter.logo_url}
+            src={logo}
             alt={`${name} logo`}
             className="h-full w-full object-contain"
           />
         ) : (
-          <Building2 className={compact ? "size-5" : "size-6"} />
+          <Building2 className={compact ? "size-5" : "size-6"} style={{ color }} />
         )}
       </div>
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Recruiter
+        <p className="text-xs font-medium uppercase tracking-wider" style={{ color: color + 'cc' }}>
+          {name}
         </p>
-        <p className="mt-1 text-sm font-medium text-foreground">{name}</p>
       </div>
     </div>
   );
@@ -2594,7 +2633,7 @@ function SectionHeading({
   return (
     <div>
       <div className="flex items-center gap-2">
-        <Icon className="size-4 text-primary" />
+        <Icon className="size-4" style={{ color: 'var(--brand-color)' }} />
         <h2 className="font-display text-base font-semibold">{title}</h2>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>

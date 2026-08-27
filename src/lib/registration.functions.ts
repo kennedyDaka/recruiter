@@ -13,6 +13,9 @@ const schema = z.object({
   email: z.string().trim().email().max(255),
   website: z.string().trim().max(255).optional().default(""),
   logoUrl: z.string().trim().max(500).optional().default(""),
+  logoData: z.string().max(10_000_000).optional().default(""),
+  brandColor: z.string().max(7).optional().default("#2563eb"),
+  brandFont: z.string().max(50).optional().default("Inter"),
   fullName: z.string().trim().min(2).max(120),
   adminPhone: z.string().trim().max(40).optional().default(""),
   autoPipelineEnabled: z.boolean().optional().default(false),
@@ -76,6 +79,9 @@ export const registerCompany = createServerFn({ method: "POST" })
         email: data.email,
         website: data.website || null,
         logo_url: data.logoUrl || null,
+        logo_data: data.logoData || null,
+        brand_color: data.brandColor || "#2563eb",
+        brand_font: data.brandFont || "Inter",
         settings: settings,
       })
       .select("id")

@@ -122,7 +122,7 @@ function ShareVacancyPage() {
     setMeta("property", "og:title", title);
     setMeta("property", "og:description", desc);
     setMeta("property", "og:type", "website");
-    setMeta("property", "og:site_name", (campaign as any)?.company_name || (campaign as any)?.tenants?.name || "Operon Recruit");
+    setMeta("property", "og:site_name", (campaign as any)?.company_name || (campaign as any)?.tenants?.name || "");
     setMeta("name", "description", desc);
     setMeta("name", "twitter:card", "summary");
     setMeta("name", "twitter:title", title);

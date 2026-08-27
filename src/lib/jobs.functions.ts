@@ -13,7 +13,7 @@ export const getPublicJobsFn = createServerFn({ method: "GET" }).handler(
     const { data, error } = await supabaseAdmin
       .from("campaigns")
       .select(
-        "id, name, job_title, location, employment_type, closing_date, status, public_token, logo_data, brand_color, company_name, tenants(name, logo_url)"
+        "id, name, job_title, location, employment_type, closing_date, status, public_token, tenants(name, logo_url, logo_data, brand_color, brand_font)"
       )
       .in("status", ["active", "closing_soon"])
       .order("created_at", { ascending: false });

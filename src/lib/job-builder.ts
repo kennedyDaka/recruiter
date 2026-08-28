@@ -1369,7 +1369,7 @@ export function billableDays(openingDate: string, closingDate: string) {
   const start = new Date(openingDate).getTime();
   const end = new Date(closingDate).getTime();
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
-  return Math.max(1, Math.round((end - start) / 86_400_000) + 1);
+  return Math.max(1, Math.ceil((end - start) / 86_400_000) + 1);
 }
 
 export const DAILY_RATE_MWK = 15_000;

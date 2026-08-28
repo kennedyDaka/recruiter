@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 /** Fetch all campaigns for the authenticated user's tenant. */
 export const getTenantCampaignsFn = createServerFn({ method: "GET" }).handler(
@@ -28,7 +29,6 @@ export const getTenantCampaignsFn = createServerFn({ method: "GET" }).handler(
 /** Fetch a single campaign with full details. */
 export const getCampaignDetailFn = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
-    const { z } = require("zod");
     return z.object({ campaignId: z.string() }).parse(input);
   })
   .handler(async ({ data }) => {

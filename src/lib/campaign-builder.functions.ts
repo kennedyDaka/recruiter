@@ -165,7 +165,7 @@ export const publishCampaign = createServerFn({ method: "POST" })
     if (!closing) throw new Error("Set a closing date before publishing.");
     const days = Math.max(
       1,
-      Math.round((new Date(closing).getTime() - new Date(start).getTime()) / 86_400_000) + 1,
+      Math.ceil((new Date(closing).getTime() - new Date(start).getTime()) / 86_400_000) + 1,
     );
 
     // Update campaign status to indicate payment is pending.

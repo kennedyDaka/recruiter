@@ -112,14 +112,20 @@ export async function applyAutoPipeline(args: {
     .eq("id", args.applicationId);
   if (updated.error) throw new Error(updated.error.message);
 
-  const fromStageRes = stageId
-    ? await supabaseAdmin.from("recruitment_stages").select("name").eq("id", previous?.stage_id ?? "").maybeSingle()
-    : null;
+  let fromStage: string | null = previous?.status ?? null;
+  if (previous?.stage_id) {
+    const fromStageRes = await supabaseAdmin
+      .from("recruitment_stages")
+      .select("name")
+      .eq("id", previous.stage_id)
+      .maybeSingle();
+    if (fromStageRes.data?.name) fromStage = fromStageRes.data.name as string;
+  }
 
   await supabaseAdmin.from("application_stage_history").insert({
     tenant_id: args.tenantId,
     application_id: args.applicationId,
-    from_stage: fromStageRes?.data?.name ?? previous?.status ?? null,
+    from_stage: fromStage,
     to_stage: target.stage,
     changed_by: "system",
   });

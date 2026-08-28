@@ -5,6 +5,11 @@ import { getPublicJobsFn } from "@/lib/jobs.functions";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 
+/** Capitalise the first letter of each word */
+function toTitleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export const Route = createFileRoute("/jobs")({
   head: () => ({
     meta: [
@@ -63,8 +68,8 @@ function JobsPage() {
                   </div>
                 )}
                 <div>
-                  <h2 className="font-display text-lg font-semibold" style={{ color: job.tenants?.brand_color || '#1e293b' }}>
-                    {job.job_title}
+                  <h2 className="font-display text-lg font-bold" style={{ color: '#000000' }}>
+                    {toTitleCase(job.job_title)}
                   </h2>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                     {job.tenants?.name || ''}

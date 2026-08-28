@@ -210,6 +210,11 @@ const emptyReferee = (): RefereeEntry => ({
   email: "",
 });
 
+/** Capitalise the first letter of each word */
+function toTitleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const APPLICATION_CONSENT_VERSION = "2026-08-14";
 
 const emptyPersonalForm = (): PersonalForm => ({
@@ -1274,8 +1279,8 @@ function ApplyPage() {
                   <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#94a3b8' }}>
                     Application wizard
                   </p>
-                  <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: '#1e293b' }}>
-                    {campaign?.job_title ?? "Apply"}
+                  <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: '#000000' }}>
+                    {toTitleCase(campaign?.job_title ?? "Apply")}
                   </h1>
                   <p className="mt-1 text-sm" style={{ color: '#64748b' }}>
                     {[campaign?.location, campaign?.employment_type].filter(Boolean).join(" - ") ||
@@ -2451,8 +2456,8 @@ function VacancyOverview({
             <p className="mt-6 text-xs font-medium uppercase tracking-wider" style={{ color: '#94a3b8' }}>
               Open vacancy
             </p>
-            <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl" style={{ color: brandColor }}>
-              {campaign.job_title ?? campaign.name ?? "Open role"}
+            <h1 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl" style={{ color: '#000000' }}>
+              {toTitleCase(campaign.job_title ?? campaign.name ?? "Open role")}
             </h1>
             {campaign.name && campaign.name !== campaign.job_title ? (
               <p className="mt-2 text-sm text-muted-foreground">{campaign.name}</p>

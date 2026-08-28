@@ -40,6 +40,11 @@ function LinkedInIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+/** Capitalise the first letter of each word */
+function toTitleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function parseList(val: string | null): string[] {
   if (!val) return [];
   try {
@@ -223,8 +228,8 @@ function ShareVacancyPage() {
               <h2 className="text-sm font-medium text-muted-foreground">
                 {(campaign as any)?.company_name || (campaign as any)?.tenants?.name || ''}
               </h2>
-              <h1 className="text-2xl md:text-3xl font-bold" style={{ color: (campaign as any)?.brand_color || undefined }}>
-                {campaign.job_title || campaign.name}
+              <h1 className="text-2xl md:text-3xl font-bold" style={{ color: '#000000' }}>
+                {campaign.job_title ? toTitleCase(campaign.job_title) : campaign.name}
               </h1>
             </div>
           </div>
@@ -392,7 +397,7 @@ function ShareVacancyPage() {
             <div>
               <p className="font-semibold">{campaign.tenants?.name || "Operon Recruit"}</p>
               <p className="text-sm text-muted-foreground">
-                {campaign.job_title || campaign.name}
+                {toTitleCase(campaign.job_title || campaign.name || '')}
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">

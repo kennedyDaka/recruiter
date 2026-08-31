@@ -19,7 +19,7 @@ export const AI_WATCHDOG_ENABLED = process.env["AI_WATCHDOG_ENABLED"] !== "false
 
 export const AI_PROVIDER = process.env["AI_PROVIDER"] || "gemini";
 export const GEMINI_API_KEY = process.env["GEMINI_API_KEY"] || "";
-export const GEMINI_MODEL = process.env["GEMINI_MODEL"] || "gemini-2.0-flash";
+export const GEMINI_MODEL = process.env["GEMINI_MODEL"] || "gemini-3.5-flash-lite";
 
 // ─── Queue Settings ───────────────────────────────────────────────
 

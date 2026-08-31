@@ -40,6 +40,7 @@ model Tenant {
   subscriptions  Subscription[]
   userRoles      UserRole[]
   incidents      Incident[]
+  aiJobs         AiJob[]
 
   @@map("tenants")
 }
@@ -845,4 +846,156 @@ model IncidentEvent {
 
   @@index([incident_id, created_at])
   @@map("incident_events")
+}
+
+// ─── AI Integration Layer ───────────────────────────────────────────
+
+/** AI processing jobs — tracks every Gemini request through its lifecycle. */
+model AiJob {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  application_id String?
+  candidate_id   String?
+  document_id    String?
+
+  // Job classification
+  job_type       String   @default("cv_processing") // cv_processing | vacancy_structuring
+  status         String   @default("created") // created | queued | processing | validating | completed | failed | retry_scheduled | fallback_processing | fallback_completed
+  priority       Int      @default(0) // Higher = processed first
+
+  // Provider info
+  provider       String   @default("gemini")
+  provider_job_id String?
+
+  // Input/Output
+  input_hash     String?  // Document fingerprint for deduplication
+  input_summary  String?  // Brief description of what was sent
+  raw_response   String?  // Raw Gemini response (JSON)
+  parsed_output  String?  // Validated & normalized output
+
+  // Retry tracking
+  attempts       Int      @default(0)
+  max_attempts   Int      @default(3)
+  last_error     String?
+  error_code     String?  // Standardized: AI-PDF-001, AI-GEMINI-001, etc.
+
+  // Timing
+  queued_at      DateTime?
+  started_at     DateTime?
+  completed_at   DateTime?
+  next_retry_at  DateTime?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  logs           AiProcessingLog[]
+  result         AiResult?
+
+  @@index([tenant_id, status])
+  @@index([tenant_id, job_type, status])
+  @@index([status, next_retry_at])
+  @@index([input_hash])
+  @@index([application_id])
+  @@map("ai_jobs")
+}
+
+/** AI processing logs — detailed audit trail for every AI operation. */model AiProcessingLog {
+  id             String   @id @default(uuid())
+  job_id         String
+  tenant_id      String
+
+  // Event details
+  event_type     String   // queued | started | attempt | success | validation_failed | retry | fallback_started | fallback_completed | rate_limited | timeout | error
+  attempt_number Int      @default(1)
+  provider       String   @default("gemini")
+
+  // Result details
+  status         String?  // success | error | timeout | rate_limited | invalid_response
+  error_code     String?
+  error_message  String?
+  http_status    Int?
+
+  // Timing
+  duration_ms    Int?
+  created_at     DateTime @default(now())
+
+  job            AiJob    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([job_id])
+  @@index([tenant_id, created_at])
+  @@index([error_code])
+  @@map("ai_processing_logs")
+}
+
+/** AI provider status — tracks provider health and circuit breaker state. */
+model AiProviderStatus {
+  id             String   @id @default(uuid())
+  provider       String   @unique // gemini, openai, etc.
+  status         String   @default("active") // active | degraded | unavailable
+  circuit_state  String   @default("closed") // closed | open | half_open
+  failure_count  Int      @default(0)
+  success_count  Int      @default(0)
+  last_failure_at DateTime?
+  last_success_at DateTime?
+  last_health_check DateTime?
+  next_available_at DateTime?
+  total_requests Int      @default(0)
+  total_failures Int      @default(0)
+  avg_response_ms Int     @default(0)
+  metadata       String?  // JSON: additional provider-specific state
+  updated_at     DateTime @updatedAt
+  created_at     DateTime @default(now())
+
+  @@map("ai_provider_status")
+}
+
+/** AI results — reusable structured candidate profiles from successful CV analysis. */
+model AiResult {
+  id             String   @id @default(uuid())
+  job_id         String   @unique
+  tenant_id      String
+  document_hash  String?  // For deduplication across applications
+  candidate_name String?
+  candidate_email String?
+  candidate_phone String?
+
+  // Structured output (mapped to ORS scoring input)
+  education      String?  // JSON: CandidateEducation[]
+  experience     String?  // JSON: CandidateExperience[]
+  skills         String?  // JSON: string[]
+  certifications String?  // JSON: string[]
+  total_experience_years Float?
+  relevant_experience String? // JSON: string[]
+  additional_info String? // JSON: any other extracted info
+
+  // Quality
+  confidence     String?  // high | medium | low
+  raw_output     String?  // Full Gemini output before normalization
+  normalization_notes String?
+
+  created_at     DateTime @default(now())
+
+  job            AiJob    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, document_hash])
+  @@index([document_hash])
+  @@map("ai_results")
+}
+
+/** AI document hashes — prevents re-processing identical CVs. */
+model AiDocumentHash {
+  id             String   @id @default(uuid())
+  document_hash  String   @unique
+  tenant_id      String
+  application_id String?
+  document_id    String?
+  file_name      String?
+  file_size      Int?
+  result_id      String?  // Links to successful AiResult
+  provider       String   @default("gemini")
+  created_at     DateTime @default(now())
+
+  @@index([tenant_id, document_hash])
+  @@index([document_hash])
+  @@map("ai_document_hashes")
 }

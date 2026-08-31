@@ -31,4 +31,5 @@ export const QUEUES = {
   SMS: "sms",
   NOTIFICATIONS: "notifications",
   EXPORTS: "exports",
+  AI_PROCESSING: "ai-processing",
 } as const;

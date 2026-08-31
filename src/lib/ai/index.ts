@@ -60,6 +60,7 @@ export {
   recordDocumentHash,
   getAiHealthDashboard,
   getRecentLogs,
+  getAiMetrics,
 } from "./logging";
 
 // Provider

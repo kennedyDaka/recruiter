@@ -10,6 +10,7 @@ import { processVacancyStructuring } from "@/lib/ai/service";
 import {
   getAiHealthDashboard,
   getRecentLogs,
+  getAiMetrics,
 } from "@/lib/ai/logging";
 import { getCircuitStatus, resetCircuit, runHealthCheck } from "@/lib/ai/circuit-breaker";
 
@@ -80,4 +81,21 @@ export const resetAiCircuitFn = createServerFn({ method: "POST" })
     const status = await getCircuitStatus("gemini");
 
     return { reset: true, healthCheck: isHealthy, status };
+  });
+
+// ─── Admin Metrics ────────────────────────────────────────────────
+
+/**
+ * Comprehensive AI metrics: queue depth, throughput, trends, per-tenant usage.
+ * Admin-only endpoint for real-time monitoring.
+ */
+export const getAiMetricsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (!context.tenantId) {
+      return { metrics: null };
+    }
+
+    const metrics = await getAiMetrics();
+    return { metrics };
   });

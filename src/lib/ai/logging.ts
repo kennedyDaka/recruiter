@@ -342,3 +342,223 @@ export async function getRecentLogs(
     return [];
   }
 }
+
+// ─── Comprehensive Metrics ────────────────────────────────────────
+
+export interface AiMetrics {
+  // Real-time queue state
+  queue: {
+    depth: number;           // Currently queued jobs
+    processing: number;      // Currently being processed
+    retryScheduled: number;  // Waiting for retry
+  };
+  // Throughput
+  throughput: {
+    last1h: number;
+    last6h: number;
+    last24h: number;
+    last7d: number;
+  };
+  // Success/failure rates
+  outcomes: {
+    aiSuccess: number;
+    fallbackCompleted: number;
+    failed: number;
+    totalAllTime: number;
+    successRate: string;
+    fallbackRate: string;
+  };
+  // Performance
+  performance: {
+    avgResponseMs: number;
+    p50ResponseMs: number;
+    p95ResponseMs: number;
+    avgRetries: number;
+  };
+  // Per-tenant usage (top 10)
+  tenantUsage: Array<{
+    tenantId: string;
+    tenantName: string;
+    totalJobs: number;
+    successful: number;
+    failed: number;
+  }>;
+  // Currently processing jobs
+  activeJobs: Array<{
+    id: string;
+    tenantId: string;
+    applicationId: string | null;
+    jobType: string;
+    startedAt: string;
+    elapsedSec: number;
+  }>;
+  // Hourly trend (last 24h)
+  hourlyTrend: Array<{
+    hour: string;
+    total: number;
+    successful: number;
+    failed: number;
+  }>;
+  // Provider status
+  provider: AiHealthDashboard;
+}
+
+/**
+ * Get comprehensive AI metrics for the admin dashboard.
+ * Combines queue state, throughput, trends, and per-tenant breakdown.
+ */
+export async function getAiMetrics(): Promise<AiMetrics> {
+  try {
+    const [
+      queueState,
+      throughput1h,
+      throughput6h,
+      throughput24h,
+      throughput7d,
+      outcomes,
+      perfAvg,
+      perfP50,
+      perfP95,
+      perfRetries,
+      tenantUsage,
+      activeJobs,
+      hourlyTrend,
+    ] = await Promise.all([
+      // Queue state
+      dbQueryFirst(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'queued') as depth,
+          COUNT(*) FILTER (WHERE status = 'processing') as processing,
+          COUNT(*) FILTER (WHERE status = 'retry_scheduled') as retry_scheduled
+        FROM ai_jobs
+      `),
+      // Throughput
+      dbQueryFirst(`SELECT COUNT(*) as count FROM ai_jobs WHERE created_at > NOW() - INTERVAL '1 hour'`),
+      dbQueryFirst(`SELECT COUNT(*) as count FROM ai_jobs WHERE created_at > NOW() - INTERVAL '6 hours'`),
+      dbQueryFirst(`SELECT COUNT(*) as count FROM ai_jobs WHERE created_at > NOW() - INTERVAL '24 hours'`),
+      dbQueryFirst(`SELECT COUNT(*) as count FROM ai_jobs WHERE created_at > NOW() - INTERVAL '7 days'`),
+      // Outcomes
+      dbQueryFirst(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'completed') as ai_success,
+          COUNT(*) FILTER (WHERE status = 'fallback_completed') as fallback_completed,
+          COUNT(*) FILTER (WHERE status = 'failed') as failed,
+          COUNT(*) as total
+        FROM ai_jobs
+      `),
+      // Performance
+      dbQueryFirst(`
+        SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000) as avg_ms
+        FROM ai_jobs WHERE completed_at IS NOT NULL AND started_at IS NOT NULL
+      `),
+      dbQueryFirst(`
+        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000) as p50
+        FROM ai_jobs WHERE completed_at IS NOT NULL AND started_at IS NOT NULL
+      `),
+      dbQueryFirst(`
+        SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000) as p95
+        FROM ai_jobs WHERE completed_at IS NOT NULL AND started_at IS NOT NULL
+      `),
+      dbQueryFirst(`SELECT AVG(attempts) as avg_retries FROM ai_jobs WHERE attempts > 0`),
+      // Tenant usage (top 10)
+      dbQuery(
+        `SELECT j.tenant_id, t.name as tenant_name,
+                COUNT(*) as total_jobs,
+                COUNT(*) FILTER (WHERE j.status = 'completed') as successful,
+                COUNT(*) FILTER (WHERE j.status = 'failed') as failed
+         FROM ai_jobs j
+         LEFT JOIN tenants t ON j.tenant_id = t.id
+         GROUP BY j.tenant_id, t.name
+         ORDER BY total_jobs DESC
+         LIMIT 10`,
+      ),
+      // Currently active jobs
+      dbQuery(
+        `SELECT id, tenant_id, application_id, job_type, started_at,
+                EXTRACT(EPOCH FROM (NOW() - started_at)) as elapsed_sec
+         FROM ai_jobs
+         WHERE status = 'processing'
+         ORDER BY started_at ASC
+         LIMIT 20`,
+      ),
+      // Hourly trend (last 24h)
+      dbQuery(
+        `SELECT
+           date_trunc('hour', created_at) as hour,
+           COUNT(*) as total,
+           COUNT(*) FILTER (WHERE status = 'completed') as successful,
+           COUNT(*) FILTER (WHERE status = 'failed') as failed
+         FROM ai_jobs
+         WHERE created_at > NOW() - INTERVAL '24 hours'
+         GROUP BY date_trunc('hour', created_at)
+         ORDER BY hour ASC`,
+      ),
+    ]);
+
+    const total = Number(outcomes?.total ?? 0);
+    const aiSuccess = Number(outcomes?.ai_success ?? 0);
+    const fallbackCompleted = Number(outcomes?.fallback_completed ?? 0);
+
+    return {
+      queue: {
+        depth: Number(queueState?.depth ?? 0),
+        processing: Number(queueState?.processing ?? 0),
+        retryScheduled: Number(queueState?.retry_scheduled ?? 0),
+      },
+      throughput: {
+        last1h: Number(throughput1h?.count ?? 0),
+        last6h: Number(throughput6h?.count ?? 0),
+        last24h: Number(throughput24h?.count ?? 0),
+        last7d: Number(throughput7d?.count ?? 0),
+      },
+      outcomes: {
+        aiSuccess,
+        fallbackCompleted,
+        failed: Number(outcomes?.failed ?? 0),
+        totalAllTime: total,
+        successRate: total > 0 ? `${((aiSuccess / total) * 100).toFixed(1)}%` : "0%",
+        fallbackRate: total > 0 ? `${((fallbackCompleted / total) * 100).toFixed(1)}%` : "0%",
+      },
+      performance: {
+        avgResponseMs: Math.round(Number(perfAvg?.avg_ms ?? 0)),
+        p50ResponseMs: Math.round(Number(perfP50?.p50 ?? 0)),
+        p95ResponseMs: Math.round(Number(perfP95?.p95 ?? 0)),
+        avgRetries: Math.round(Number(perfRetries?.avg_retries ?? 0) * 10) / 10,
+      },
+      tenantUsage: (tenantUsage ?? []).map((t: any) => ({
+        tenantId: t.tenant_id,
+        tenantName: t.tenant_name ?? "Unknown",
+        totalJobs: Number(t.total_jobs),
+        successful: Number(t.successful),
+        failed: Number(t.failed),
+      })),
+      activeJobs: (activeJobs ?? []).map((j: any) => ({
+        id: j.id,
+        tenantId: j.tenant_id,
+        applicationId: j.application_id,
+        jobType: j.job_type,
+        startedAt: j.started_at,
+        elapsedSec: Math.round(Number(j.elapsed_sec)),
+      })),
+      hourlyTrend: (hourlyTrend ?? []).map((h: any) => ({
+        hour: h.hour,
+        total: Number(h.total),
+        successful: Number(h.successful),
+        failed: Number(h.failed),
+      })),
+      provider: await getAiHealthDashboard("gemini"),
+    };
+  } catch (err) {
+    console.error("[AI Metrics] Failed to fetch metrics:", err);
+    return {
+      queue: { depth: 0, processing: 0, retryScheduled: 0 },
+      throughput: { last1h: 0, last6h: 0, last24h: 0, last7d: 0 },
+      outcomes: { aiSuccess: 0, fallbackCompleted: 0, failed: 0, totalAllTime: 0, successRate: "0%", fallbackRate: "0%" },
+      performance: { avgResponseMs: 0, p50ResponseMs: 0, p95ResponseMs: 0, avgRetries: 0 },
+      tenantUsage: [],
+      activeJobs: [],
+      hourlyTrend: [],
+      provider: await getAiHealthDashboard("gemini"),
+    };
+  }
+}

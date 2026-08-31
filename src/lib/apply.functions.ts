@@ -635,6 +635,31 @@ export const submitApplication = createServerFn({ method: "POST" })
       // Best-effort — a pipeline failure must never block a submission.
     }
 
+    // AI CV processing: if a PDF CV was submitted and AI is enabled,
+    // queue it for Gemini analysis in the background. The candidate
+    // submission is already complete — this is fire-and-forget.
+    try {
+      const cvDocument = data.documents.find(
+        (d) => d.doc_type.toLowerCase() === "cv" && d.file_data,
+      );
+      if (cvDocument?.file_data) {
+        const { requestAiCvProcessing } = await import("@/lib/ai/service");
+        const requiredSkills = parseJsonList(campaign.required_skills);
+        const jobTitle = campaign.job_title as string | undefined;
+        await requestAiCvProcessing({
+          tenantId,
+          applicationId,
+          candidateId,
+          pdfBase64: cvDocument.file_data,
+          fileName: cvDocument.file_name,
+          ...(jobTitle ? { jobTitle } : {}),
+          ...(requiredSkills.length > 0 ? { requiredSkills } : {}),
+        });
+      }
+    } catch {
+      // Best-effort — AI failure must never block a submission.
+    }
+
     return {
       reference: applicationReference,
       score: scored.total,

@@ -59,6 +59,7 @@ import {
   FALLBACK_LICENSES,
   FALLBACK_SKILLS,
 } from "@/lib/recruitment-catalog";
+import { PasteVacancyDialog, type ParsedVacancy } from "@/components/recruitment/PasteVacancyDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -462,6 +463,38 @@ export function CampaignWizard() {
       typeof values === "function" ? { ...prev, ...values(prev) } : { ...prev, ...values },
     );
 
+  /** Populate the builder from an AI-parsed vacancy. */
+  const handleVacancyParsed = (vacancy: ParsedVacancy) => {
+    patch({
+      jobTitle: vacancy.job_title || builder.jobTitle,
+      jobDescription: vacancy.job_description || builder.jobDescription,
+      department: vacancy.department || builder.department,
+      locations: vacancy.location ? [vacancy.location] : builder.locations,
+      employmentType: vacancy.employment_type || builder.employmentType,
+      responsibilities: vacancy.responsibilities.length > 0
+        ? vacancy.responsibilities.map((r, i) => ({
+            id: `ai_${i}_${Date.now()}`,
+            text: r,
+            source: "ai" as const,
+          }))
+        : builder.responsibilities,
+      requiredSkills: vacancy.required_skills.length > 0
+        ? vacancy.required_skills.map((s, i) => ({
+            name: s,
+            level: "required" as const,
+            source: "ai" as const,
+          }))
+        : builder.requiredSkills,
+      preferredSkills: vacancy.preferred_skills.length > 0
+        ? vacancy.preferred_skills.map((s, i) => ({
+            name: s,
+            level: "preferred" as const,
+            source: "ai" as const,
+          }))
+        : builder.preferredSkills,
+    });
+  };
+
   const industries = useQuery({
     queryKey: ["industries"],
     queryFn: async () => {
@@ -697,6 +730,9 @@ export function CampaignWizard() {
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         {step === 0 ? (
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <PasteVacancyDialog onVacancyParsed={handleVacancyParsed} />
+            </div>
             <Field label="Reason for hiring">
               <Select
                 value={builder.hiringReason}

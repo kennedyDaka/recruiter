@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { AiHealthDashboard } from "@/components/app/AiHealthDashboard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { FileText, Globe2, Mail, MessageCircle, Paintbrush, RotateCcw, Send, Upload, Zap } from "lucide-react";
+import { Brain, FileText, Globe2, Mail, MessageCircle, Paintbrush, RotateCcw, Send, Upload, Zap } from "lucide-react";
 import { getTenantBrandingFn, updateTenantBrandingFn } from "@/lib/branding.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -651,6 +652,24 @@ function SettingsPage() {
                 </p>
               </div>
               <Switch checked={false} disabled aria-disabled />
+            </div>
+          </div>
+        </section>
+
+        {/* ── AI Integration ───────────────────────────────────────── */}
+        <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="grid size-10 place-items-center rounded-lg bg-purple-500 text-white">
+              <Brain className="size-5" />
+            </div>
+            <div className="flex-1">
+              <div>
+                <h2 className="text-lg font-semibold">AI Integration</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Monitor Gemini AI health, queue status and circuit breaker state.
+                </p>
+              </div>
+              <AiHealthDashboard />
             </div>
           </div>
         </section>

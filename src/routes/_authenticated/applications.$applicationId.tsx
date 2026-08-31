@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { DIMENSION_LABELS, type EligibilityGate, type OrsBreakdown } from "@/lib/ors";
 import { CircleCheck, CircleX } from "lucide-react";
+import { AiExtractionTab } from "@/components/app/AiExtractionTab";
 
 const STATUSES = [
   "started",
@@ -230,6 +231,20 @@ function ApplicationDetail() {
           .order("created_at", { ascending: false }),
       ]);
 
+      // AI extraction results (best-effort — table may not exist yet)
+      let aiResults: any[] = [];
+      try {
+        const aiRes = await supabase
+          .from("ai_jobs" as any)
+          .select("id, status, raw_response, parsed_output, attempts, error_code, created_at, completed_at")
+          .eq("application_id", applicationId)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        aiResults = (aiRes.data as any[]) ?? [];
+      } catch {
+        // ai_jobs table may not exist yet — ignore
+      }
+
       const relatedError = [
         education.error,
         experience.error,
@@ -258,6 +273,7 @@ function ApplicationDetail() {
         history: history.data ?? [],
         stages: stages.data ?? [],
         communications: communications.data ?? [],
+        aiResults,
       };
     },
   });
@@ -567,6 +583,12 @@ function ApplicationDetail() {
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="interviews">Interviews</TabsTrigger>
               <TabsTrigger value="emails">Emails</TabsTrigger>
+              {(data?.aiResults?.length ?? 0) > 0 && (
+                <TabsTrigger value="ai" className="gap-1">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  AI Extraction
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="profile" className="mt-4 grid gap-6">
@@ -979,6 +1001,10 @@ function ApplicationDetail() {
                   )}
                 </Section>
               </div>
+            </TabsContent>
+
+            <TabsContent value="ai" className="mt-4">
+              <AiExtractionTab aiResults={data?.aiResults ?? []} />
             </TabsContent>
           </Tabs>
         </div>

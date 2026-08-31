@@ -54,12 +54,14 @@ export async function shouldAllowRequest(
   const status = await getProviderStatus(provider);
   if (!status) return true;
 
-  if (status.state === "closed") return true;
+  const state = status.circuit_state as CircuitState;
+  if (state === "closed") return true;
 
-  if (status.state === "open") {
+  if (state === "open") {
     // Check if recovery window has elapsed
-    if (status.nextAvailableAt) {
-      const nextAvailable = new Date(status.nextAvailableAt).getTime();
+    const nextAvailStr = status.next_available_at as string | null;
+    if (nextAvailStr) {
+      const nextAvailable = new Date(nextAvailStr).getTime();
       if (Date.now() >= nextAvailable) {
         // Transition to half-open
         await updateProviderStatus(provider, {

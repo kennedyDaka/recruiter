@@ -15,7 +15,9 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "node --loader ts-node/esm prisma/seed.ts",
-    "workers": "node --loader ts-node/esm src/workers/index.ts"
+    "workers": "node --loader ts-node/esm src/workers/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
@@ -107,6 +109,7 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "7.1.9"
+    "vite": "7.1.9",
+    "vitest": "^4.1.11"
   }
 }

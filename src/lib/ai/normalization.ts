@@ -134,8 +134,8 @@ export function normalizeGeminiToScoringInput(
     });
   }) as Array<{ qualification: string; institution?: string; fieldOfStudy?: string; startYear?: number; endYear?: number }>;
 
-  // Highest qualification
-  const highest = education
+  // Highest qualification (copy array to avoid mutating the education list)
+  const highest = [...education]
     .sort((a, b) => (QUAL_RANK[a.qualification.toLowerCase()] ?? 0) - (QUAL_RANK[b.qualification.toLowerCase()] ?? 0))
     .pop()?.qualification;
 

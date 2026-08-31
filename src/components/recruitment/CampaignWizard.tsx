@@ -465,33 +465,91 @@ export function CampaignWizard() {
 
   /** Populate the builder from an AI-parsed vacancy. */
   const handleVacancyParsed = (vacancy: ParsedVacancy) => {
+    // Parse experience years from text like "3+ years" or "three years"
+    const WORD_NUMS: Record<string, number> = {
+      one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+      seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    };
+    const parseExperienceYears = (texts: string[]): number => {
+      const joined = texts.join(" ").toLowerCase();
+      // Try digit match first: "3+ years"
+      const digitMatch = joined.match(/(\d+)\+?\s*(?:year|yr)/i);
+      if (digitMatch?.[1]) return parseInt(digitMatch[1], 10);
+      // Try word match: "three years"
+      for (const [word, num] of Object.entries(WORD_NUMS)) {
+        if (new RegExp(`\\b${word}\\b.*?(?:year|yr)`, "i").test(joined)) return num;
+      }
+      return builder.minExperience;
+    };
+
+    // Map qualification text to the closest ORS level
+    const mapQualification = (quals: string[]): string => {
+      const joined = quals.join(" ").toLowerCase();
+      if (/master|mba|postgraduate/.test(joined)) return "Master's Degree";
+      if (/bachelor|b\.?sc|b\.?a|b\.?eng|degree/.test(joined)) return "Bachelor's Degree";
+      if (/diploma/.test(joined)) return "Diploma";
+      if (/certificate|cert/.test(joined)) return "Certificate";
+      if (/phd|doctor/.test(joined)) return "Doctorate";
+      return builder.minQualification || "Diploma";
+    };
+
     patch({
       jobTitle: vacancy.job_title || builder.jobTitle,
-      jobDescription: vacancy.job_description || builder.jobDescription,
       department: vacancy.department || builder.department,
-      locations: vacancy.location ? [vacancy.location] : builder.locations,
       employmentType: vacancy.employment_type || builder.employmentType,
+
+      // Location mapping — parse "Lilongwe, Central, Malawi" into city/region/country
+      ...(vacancy.location ? (() => {
+        const parts = vacancy.location.split(",").map((s: string) => s.trim());
+        return {
+          city: parts[0] || builder.city,
+          region: parts.length > 2 ? parts[1] : builder.region,
+          country: parts.length > 2 ? parts[parts.length - 1] : (parts[1] || builder.country),
+          workLocation: vacancy.location,
+        };
+      })() : {}),
+
+      // Qualifications → minQualification
+      minQualification: mapQualification(vacancy.qualifications),
+
+      // Experience → minExperience
+      minExperience: parseExperienceYears(vacancy.required_experience),
+
+      // Responsibilities — use the duty field for full text phrases
       responsibilities: vacancy.responsibilities.length > 0
-        ? vacancy.responsibilities.map((r, i) => ({
-            id: `ai_${i}_${Date.now()}`,
-            text: r,
-            source: "ai" as const,
+        ? vacancy.responsibilities.map((r: string) => ({
+            action: "",
+            object: "",
+            duty: r,
           }))
         : builder.responsibilities,
-      requiredSkills: vacancy.required_skills.length > 0
-        ? vacancy.required_skills.map((s, i) => ({
-            name: s,
-            level: "required" as const,
-            source: "ai" as const,
-          }))
-        : builder.requiredSkills,
-      preferredSkills: vacancy.preferred_skills.length > 0
-        ? vacancy.preferred_skills.map((s, i) => ({
-            name: s,
-            level: "preferred" as const,
-            source: "ai" as const,
-          }))
-        : builder.preferredSkills,
+
+      // Skills — merge into the combined skills array
+      skills: (() => {
+        const existing = [...builder.skills];
+        for (const s of vacancy.required_skills) {
+          if (!existing.some((e) => e.name.toLowerCase() === s.toLowerCase())) {
+            existing.push({ name: s, category: "", level: "required" as const });
+          }
+        }
+        for (const s of vacancy.preferred_skills) {
+          if (!existing.some((e) => e.name.toLowerCase() === s.toLowerCase())) {
+            existing.push({ name: s, category: "", level: "preferred" as const });
+          }
+        }
+        return existing;
+      })(),
+
+      // Certifications — merge into the combined certifications array
+      certifications: (() => {
+        const existing = [...builder.certifications];
+        for (const c of vacancy.certifications) {
+          if (!existing.some((e) => e.name.toLowerCase() === c.toLowerCase())) {
+            existing.push({ name: c, level: "required" as const });
+          }
+        }
+        return existing;
+      })(),
     });
   };
 

@@ -910,8 +910,7 @@ function ApplyPage() {
         /^\S+@\S+\.\S+$/.test(form.email.trim()) &&
         form.country.length > 0 &&
         form.city.trim().length > 0 &&
-        form.professional_summary.trim().length >= 40 &&
-        skills.length > 0
+        form.professional_summary.trim().length >= 40
       );
     }
     if (currentStep === "education") {
@@ -1083,7 +1082,6 @@ function ApplyPage() {
       if (!form.city.trim()) errors.push("City");
       if (form.professional_summary.trim().length < 40)
         errors.push(`Professional summary (${form.professional_summary.trim().length}/40 chars)`);
-      if (skills.length === 0) errors.push("At least one skill");
     } else if (currentStep === "education") {
       const requiredCerts = campaign?.required_certifications ?? [];
       const missingCerts = requiredCerts.filter(

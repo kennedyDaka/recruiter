@@ -93,47 +93,58 @@ export const saveCampaignDraft = createServerFn({ method: "POST" })
       if (stages.error) throw new Error(stages.error.message);
     }
 
-    // Rewrite the question set (options cascade with their question).
+    // Rewrite the question set — bulk-insert for performance.
     const deletedQuestions = await supabase
       .from("campaign_questions")
       .delete()
       .eq("campaign_id", campaignId);
     if (deletedQuestions.error) throw new Error(deletedQuestions.error.message);
 
-    let sort = 0;
-    for (const question of data.questions) {
+    if (data.questions.length > 0) {
+      // Insert all questions in one batch
+      const questionRows = data.questions.map((question, sort) => ({
+        tenant_id: tenantId,
+        campaign_id: campaignId,
+        question_text: question.text,
+        question_type: question.type,
+        options: question.options as unknown as Json,
+        dimension: question.category,
+        weight: 1,
+        sort_order: sort,
+        category: question.category,
+        is_mandatory: question.mandatory,
+        condition: (question.condition ?? null) as unknown as Json,
+      }));
       const inserted = await supabase
         .from("campaign_questions")
-        .insert({
-          tenant_id: tenantId,
-          campaign_id: campaignId,
-          question_text: question.text,
-          question_type: question.type,
-          options: question.options as unknown as Json,
-          dimension: question.category,
-          weight: 1,
-          sort_order: sort++,
-          category: question.category,
-          is_mandatory: question.mandatory,
-          condition: (question.condition ?? null) as unknown as Json,
-        })
-        .select("id")
-        .single();
+        .insert(questionRows)
+        .select("id");
       if (inserted.error) throw new Error(inserted.error.message);
 
-      if (question.options.length) {
-        const options = await supabase.from("campaign_answer_options").insert(
-          question.options.map((option, index) => ({
+      // Insert all answer options in one batch
+      const optionRows: any[] = [];
+      for (let i = 0; i < data.questions.length; i++) {
+        const q = data.questions[i];
+        if (!q) continue;
+        const questionId = inserted.data?.[i]?.id;
+        if (!questionId || !q.options.length) continue;
+        for (let j = 0; j < q.options.length; j++) {
+          const opt = q.options[j];
+          if (!opt) continue;
+          optionRows.push({
             tenant_id: tenantId,
-            question_id: inserted.data.id as string,
-            label: option.label,
-            value: option.value,
-            points: option.points,
-            is_disqualifying: Boolean(option.disqualifying),
-            sort_order: index,
-          })),
-        );
-        if (options.error) throw new Error(options.error.message);
+            question_id: questionId,
+            label: opt.label,
+            value: opt.value,
+            points: opt.points,
+            is_disqualifying: Boolean(opt.disqualifying),
+            sort_order: j,
+          });
+        }
+      }
+      if (optionRows.length > 0) {
+        const optionsRes = await supabase.from("campaign_answer_options").insert(optionRows);
+        if (optionsRes.error) throw new Error(optionsRes.error.message);
       }
     }
 

@@ -28,7 +28,7 @@ interface StorageConfig {
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
-  publicUrl?: string;
+  publicUrl?: string | undefined;
 }
 
 function getConfig(): StorageConfig | null {
@@ -103,6 +103,34 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelayMs = 
   throw lastError!;
 }
 
+// ── Signed URL Cache ────────────────────────────────────────────────
+// In-memory TTL cache to avoid regenerating R2 signed URLs on every request.
+// URLs expire after 50 minutes (signed URLs last 60 minutes).
+
+const URL_CACHE_TTL_MS = 50 * 60 * 1000; // 50 minutes
+const urlCache = new Map<string, { url: string; expiresAt: number }>();
+
+function getCachedUrl(key: string): string | null {
+  const entry = urlCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    urlCache.delete(key);
+    return null;
+  }
+  return entry.url;
+}
+
+function setCachedUrl(key: string, url: string): void {
+  urlCache.set(key, { url, expiresAt: Date.now() + URL_CACHE_TTL_MS });
+  // Evict stale entries when cache grows large
+  if (urlCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of urlCache) {
+      if (now > v.expiresAt) urlCache.delete(k);
+    }
+  }
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
 export interface StorageUploadResult {
@@ -157,6 +185,10 @@ export async function uploadDocument(params: {
  * Falls back to null if R2 is not configured (caller should use base64 fallback).
  */
 export async function getDocumentUrl(key: string): Promise<string | null> {
+  // Check cache first
+  const cached = getCachedUrl(key);
+  if (cached) return cached;
+
   const client = getClient();
   if (!client) return null;
 
@@ -180,6 +212,7 @@ export async function getDocumentUrl(key: string): Promise<string | null> {
       }),
       { expiresIn: 3600 },
     );
+    setCachedUrl(key, url);
     return url;
   } catch {
     return null;

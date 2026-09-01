@@ -703,6 +703,15 @@ function evaluateDimensionScore(
       evidence,
     });
 
+    // Convert evidence into human-readable reasons for the "Why this score" section.
+    const icon = passed ? "\u2713" : "\u25b3";
+    for (const e of evidence) {
+      // Only push short summary reasons (skip verbose per-skill lines)
+      if (e.includes("\u2192") || e.includes("/")) {
+        reasons.push(`${icon} ${group.name}: ${e}`);
+      }
+    }
+
     // Preferred groups add bonus points only — they NEVER reduce the score.
     // Required groups contribute to both numerator and denominator.
     if (group.state === "preferred") {

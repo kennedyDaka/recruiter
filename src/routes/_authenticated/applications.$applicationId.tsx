@@ -245,20 +245,25 @@ function ApplicationDetail() {
         // ai_jobs table may not exist yet — ignore
       }
 
-      const relatedError = [
-        education.error,
-        experience.error,
-        skills.error,
-        referees.error,
-        documents.error,
-        answers.error,
-        notes.error,
-        interviews.error,
-        history.error,
-        stages.error,
-        communications.error,
-      ].find(Boolean);
-      if (relatedError) throw relatedError;
+      // Log related query errors but don't break the page — the core
+      // application data is still usable even if a sub-table fails.
+      const relatedErrors = [
+        ["education", education.error],
+        ["experience", experience.error],
+        ["skills", skills.error],
+        ["referees", referees.error],
+        ["documents", documents.error],
+        ["answers", answers.error],
+        ["notes", notes.error],
+        ["interviews", interviews.error],
+        ["history", history.error],
+        ["stages", stages.error],
+        ["communications", communications.error],
+      ].filter(([, err]) => err) as [string, any][];
+      if (relatedErrors.length) {
+        console.warn("[ApplicationDetail] Related query errors (non-fatal):",
+          relatedErrors.map(([t, e]) => `${t}: ${e?.message ?? e}`).join(", "));
+      }
 
       return {
         application,

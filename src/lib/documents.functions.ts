@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { uploadDocument, getDocumentUrl, isR2Configured, getMimeType } from "@/lib/storage";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -17,9 +18,8 @@ const uploadSchema = z.object({
 /**
  * Stores a candidate document for a public campaign.
  *
- * Files are stored as base64 in the `candidate_documents.file_data` column.
- * This avoids filesystem dependencies and works on serverless platforms
- * (Vercel, AWS Lambda, etc.) where the filesystem is read-only.
+ * When Cloudflare R2 is configured, files are uploaded to R2 and only the key
+ * is stored in the database. Falls back to base64-in-DB for dev environments.
  */
 export const uploadApplicationDocument = createServerFn({ method: "POST" })
   .validator((input: unknown) => uploadSchema.parse(input))
@@ -48,23 +48,29 @@ export const uploadApplicationDocument = createServerFn({ method: "POST" })
       throw new Error("The uploaded file exceeds the 10 MB limit.");
     }
 
-    const safeName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-    const key = `${crypto.randomUUID()}-${safeName}`;
+    // Upload to R2 if configured, otherwise store base64 in DB
+    const { key, provider } = await uploadDocument({
+      tenantId: "public",
+      campaignId: data.campaignId,
+      fileName: data.fileName,
+      buffer,
+    });
+
     const storagePath = `${data.campaignId}/${key}`;
 
-    // Store the base64 data directly in the database — no filesystem needed.
     return {
       doc_type: data.docType,
       file_name: data.fileName,
       file_path: storagePath,
       file_size: buffer.byteLength,
-      file_data: data.base64,
+      // Only store base64 data when R2 is NOT configured (fallback)
+      file_data: provider === "base64" ? data.base64 : null,
     };
   });
 
 /**
  * Returns the document data for viewing/downloading.
- * Reads from the database and returns a data URI.
+ * Tries R2 signed URL first, falls back to base64 from DB.
  */
 export const applicationDocumentUrl = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
@@ -74,24 +80,28 @@ export const applicationDocumentUrl = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const doc = await supabaseAdmin
       .from("candidate_documents")
-      .select("file_name, file_data, doc_type")
+      .select("file_name, file_data, file_path, doc_type")
       .eq("file_path", data.filePath)
       .maybeSingle();
     if (doc.error) throw new Error(doc.error.message);
     if (!doc.data) throw new Error("Document not found.");
 
+    // Try R2 first — the key is the part after the campaign ID prefix
+    if (isR2Configured() && doc.data.file_path) {
+      const r2Key = doc.data.file_path.replace(/^[^/]+\//, "");
+      const signedUrl = await getDocumentUrl(r2Key);
+      if (signedUrl) {
+        return {
+          signedUrl,
+          fileName: doc.data.file_name,
+          docType: doc.data.doc_type,
+        };
+      }
+    }
+
+    // Fallback: base64 from database
     if (doc.data.file_data) {
-      // Return a data URI so the frontend can display/download the file
-      const mimeMap: Record<string, string> = {
-        pdf: "application/pdf",
-        doc: "application/msword",
-        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        png: "image/png",
-      };
-      const ext = doc.data.file_name.split(".").pop()?.toLowerCase() ?? "";
-      const mime = mimeMap[ext] ?? "application/octet-stream";
+      const mime = getMimeType(doc.data.file_name);
       return {
         signedUrl: `data:${mime};base64,${doc.data.file_data}`,
         fileName: doc.data.file_name,

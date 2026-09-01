@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AiHealthDashboard } from "@/components/app/AiHealthDashboard";
 import { createFileRoute } from "@tanstack/react-router";
+import { getCurrentSessionFn } from "@/lib/auth/session.functions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -46,6 +47,13 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function SettingsPage() {
+  const getSession = useServerFn(getCurrentSessionFn);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    getSession().then((session) => {
+      setIsAdmin((session as any)?.role === "super_admin");
+    });
+  }, [getSession]);
   const queryClient = useQueryClient();
   const getSettings = useServerFn(getTenantSettings);
   const saveSettings = useServerFn(updateTenantSettings);
@@ -656,7 +664,8 @@ function SettingsPage() {
           </div>
         </section>
 
-        {/* ── AI Integration ───────────────────────────────────────── */}
+        {/* ── AI Integration (admin only) ────────────────────────── */}
+        {isAdmin ? (
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="grid size-10 place-items-center rounded-lg bg-purple-500 text-white">
@@ -673,6 +682,7 @@ function SettingsPage() {
             </div>
           </div>
         </section>
+        ) : null}
       </div>
     </AppShell>
   );

@@ -1490,7 +1490,8 @@ function ApplyPage() {
                         <Field label="LinkedIn profile" htmlFor="linkedin_url">
                           <Input
                             id="linkedin_url"
-                            type="url"
+                            type="text"
+                            inputMode="url"
                             maxLength={500}
                             placeholder="https://linkedin.com/in/..."
                             value={form.linkedin_url}
@@ -1500,7 +1501,8 @@ function ApplyPage() {
                         <Field label="Portfolio or professional website" htmlFor="portfolio_url">
                           <Input
                             id="portfolio_url"
-                            type="url"
+                            type="text"
+                            inputMode="url"
                             maxLength={500}
                             placeholder="https://..."
                             value={form.portfolio_url}

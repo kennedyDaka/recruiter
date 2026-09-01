@@ -78,8 +78,14 @@ const submitSchema = z.object({
     country: z.string().trim().max(80).optional().default(""),
     city: z.string().trim().max(120).optional().default(""),
     professional_summary: z.string().trim().max(3000).optional().default(""),
-    linkedin_url: z.string().trim().url().max(500).or(z.literal("")).default(""),
-    portfolio_url: z.string().trim().url().max(500).or(z.literal("")).default(""),
+    linkedin_url: z.string().trim().max(500).optional().default("").refine(
+      (val) => !val || /^https?:\/\/.+/.test(val),
+      "Enter a valid URL starting with https://",
+    ),
+    portfolio_url: z.string().trim().max(500).optional().default("").refine(
+      (val) => !val || /^https?:\/\/.+/.test(val),
+      "Enter a valid URL starting with https://",
+    ),
   }),
   education: z.array(educationSchema).max(10).default([]),
   experience: z.array(experienceSchema).max(15).default([]),

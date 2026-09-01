@@ -2185,9 +2185,16 @@ function ApplyPage() {
                   Back
                 </Button>
                 {currentStep === "review" ? (
-                  <Button type="submit" size="lg" disabled={mutation.isPending}>
-                    {mutation.isPending ? "Submitting..." : "Review and submit"}
-                  </Button>
+                  <div className="flex flex-col items-end gap-2">
+                    <Button type="submit" size="lg" disabled={mutation.isPending || !consentAccepted}>
+                      {mutation.isPending ? "Submitting..." : "Review and submit"}
+                    </Button>
+                    {!consentAccepted ? (
+                      <p className="text-xs text-muted-foreground">
+                        Please accept the consent statement below to submit.
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
                   <Button type="button" size="lg" disabled={!canContinue} onClick={continueApplication}>
                     Continue

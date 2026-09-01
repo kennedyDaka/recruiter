@@ -228,18 +228,45 @@ export function CandidateMatchCard({
   const eduMet = requiredRank === 0 || eduRank >= requiredRank;
 
   // ── Field relevance for education ──
-  // Extract required education fields from the campaign builder JSON
+  // Extract required education fields from multiple sources:
+  // 1. builder.fieldsOfStudy (explicit fields)
+  // 2. builder.experienceAreas (experience → field mapping)
+  // 3. builder.industry / industryName (industry → field mapping)
+  // 4. Job title inference (e.g. "Farm Manager" → Agriculture)
   const educationRequiredFields = useMemo(() => {
     if (!campaign?.builder) return [];
     try {
       const parsed = typeof campaign.builder === 'string' ? JSON.parse(campaign.builder) : campaign.builder;
+      // 1. Direct fieldsOfStudy
       const fields = parsed?.fieldsOfStudy;
-      if (Array.isArray(fields)) {
+      if (Array.isArray(fields) && fields.length > 0) {
         return fields.map((f: unknown) => typeof f === 'string' ? f : typeof f === 'object' && f !== null && 'name' in f ? (f as { name: string }).name : null).filter((f): f is string => typeof f === 'string');
+      }
+      // 2. Experience areas → field inference
+      const expAreas = parsed?.experienceAreas;
+      if (Array.isArray(expAreas) && expAreas.length > 0) {
+        return expAreas.map((a: unknown) => typeof a === 'string' ? a : typeof a === 'object' && a !== null && 'name' in a ? (a as { name: string }).name : null).filter((f): f is string => typeof f === 'string');
+      }
+      // 3. Industry → field inference
+      const industry = parsed?.industry || parsed?.industryName;
+      if (typeof industry === 'string' && industry.length > 0) {
+        return [industry];
+      }
+      // 4. Job title → field inference (e.g. "Farm Manager" → Agriculture)
+      const jobTitle = parsed?.jobTitle || (campaign as any)?.job_title;
+      if (typeof jobTitle === 'string') {
+        const titleLower = jobTitle.toLowerCase();
+        if (titleLower.includes('farm') || titleLower.includes('agricultur') || titleLower.includes('horticultur')) return ['Agriculture'];
+        if (titleLower.includes('nurs') || titleLower.includes('health') || titleLower.includes('clinic')) return ['Nursing'];
+        if (titleLower.includes('account') || titleLower.includes('financ')) return ['Accounting'];
+        if (titleLower.includes('engineer') || titleLower.includes('technic')) return ['Engineering'];
+        if (titleLower.includes('teacher') || titleLower.includes('educat')) return ['Education'];
+        if (titleLower.includes('bank') || titleLower.includes('teller') || titleLower.includes('insurance')) return ['Finance'];
+        if (titleLower.includes('logistic') || titleLower.includes('warehouse') || titleLower.includes('supply')) return ['Logistics'];
       }
     } catch { /* ignore */ }
     return [];
-  }, [campaign?.builder]);
+  }, [campaign?.builder, (campaign as any)?.job_title]);
   const candidateFields = useMemo(
     () => education.map((e) => e.field_of_study).filter((f): f is string => Boolean(f)),
     [education],
@@ -340,8 +367,8 @@ export function CandidateMatchCard({
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Eligibility</h3>
           <div className="grid gap-2">
             {gates.map((gate) => {
-              // Override education gate reason when campaign has min_qualification
               const isEducationGate = gate.name.toLowerCase().includes("education");
+              // Override reason when v2 gate says "No minimum" but campaign has min_qualification
               const overrideReason = isEducationGate && campaign?.min_qualification && gate.reason.includes("No minimum")
                 ? (eduMet
                     ? `${highestEdu?.qualification ?? "None"} meets ${campaign.min_qualification} minimum`
@@ -350,12 +377,19 @@ export function CandidateMatchCard({
               const overridePassed = isEducationGate && campaign?.min_qualification && gate.reason.includes("No minimum")
                 ? eduMet
                 : gate.passed;
+              // Show field relevance sub-line when education level is met but candidate field is unrelated
+              const showFieldWarning = isEducationGate && eduMet && educationRequiredFields.length > 0 && fieldRelevance.relevance === "unrelated";
               return (
                 <div key={gate.name} className="flex items-start gap-2 text-sm">
-                  <GateIcon passed={overridePassed} />
+                  <GateIcon passed={overridePassed && !showFieldWarning} />
                   <div>
                     <span className="font-medium">{gate.name}</span>
                     <span className="text-muted-foreground"> — {overrideReason}</span>
+                    {showFieldWarning && (
+                      <p className="mt-0.5 text-xs text-destructive">
+                        ✕ Field relevance: {highestEdu?.field_of_study ?? "Candidate field"} is not related to {educationRequiredFields.join(", ")}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

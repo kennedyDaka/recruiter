@@ -130,14 +130,28 @@ function formatMonths(months: number): string {
 }
 
 function qualificationRank(q: string): number {
+  // Must match the ORS engine's QUALIFICATION_LEVELS ordering.
   const levels = [
-    "None", "Secondary School", "Certificate", "Diploma",
-    "Advanced Diploma", "Bachelor", "Postgraduate Diploma",
-    "Honours Degree", "Master", "Doctorate", "Professor",
+    "None",
+    "Secondary School",
+    "Certificate",
+    "Diploma",
+    "Bachelor",
+    "Postgraduate Diploma",
+    "Honours Degree",
+    "Master",
+    "Doctorate",
+    "Professor",
   ];
   const normalised = q?.trim().toLowerCase() ?? "";
-  const idx = levels.findIndex((l) => l.toLowerCase() === normalised);
-  return idx >= 0 ? idx : 0;
+  // Exact match first
+  const exact = levels.findIndex((l) => l.toLowerCase() === normalised);
+  if (exact >= 0) return exact;
+  // Fuzzy: check if the input contains a level name (e.g. "Bachelor's Degree" contains "Bachelor")
+  const fuzzy = levels.findIndex((l) =>
+    normalised.includes(l.toLowerCase()) || l.toLowerCase().includes(normalised),
+  );
+  return fuzzy >= 0 ? fuzzy : 0;
 }
 
 // ── Gate icon helpers ────────────────────────────────────────────────
@@ -235,6 +249,18 @@ export function CandidateMatchCard({
       } else {
         parts.push(`Short by ${minExpYears - yearsExperience} year${minExpYears - yearsExperience === 1 ? "" : "s"} of the ${minExpYears}-year minimum.`);
       }
+    }
+    // Experience field relevance
+    if (experience.length > 0) {
+      const fieldEntries = experience.filter((e) => e.field && e.field.trim());
+      const noFieldEntries = experience.filter((e) => !e.field || !e.field.trim());
+      if (noFieldEntries.length > 0 && fieldEntries.length === 0) {
+        parts.push("Experience records do not specify a field of work — relevance cannot be assessed.");
+      } else if (noFieldEntries.length > 0 && fieldEntries.length > 0) {
+        parts.push(`${noFieldEntries.length} of ${experience.length} experience records are missing a field of work.`);
+      }
+    } else if (minExpYears > 0) {
+      parts.push("No work experience provided in the application.");
     }
 
     // Skills insight
@@ -376,26 +402,33 @@ export function CandidateMatchCard({
           </div>
         )}
 
-        {/* Relevant experience areas */}
-        {relevantEntries.length > 0 && (
+        {/* All experience entries */}
+        {experience.length > 0 && (
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Relevant Experience
+              Work History
             </p>
             <div className="grid gap-1.5">
-              {relevantEntries.map((entry) => {
+              {experience.map((entry) => {
                 const months = monthsBetween(entry.start_date, entry.end_date, entry.is_current);
+                const hasField = Boolean(entry.field && entry.field.trim());
                 return (
                   <div key={entry.id} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <CircleCheck className="size-3.5 text-emerald-600" />
+                      {hasField ? (
+                        <CircleCheck className="size-3.5 text-emerald-600" />
+                      ) : (
+                        <AlertTriangle className="size-3.5 text-amber-500" />
+                      )}
                       <span className="font-medium">{entry.position}</span>
                       <span className="text-muted-foreground">at {entry.employer}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {entry.field ? (
+                      {hasField ? (
                         <Badge variant="outline" className="text-xs">{entry.field}</Badge>
-                      ) : null}
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">No field</Badge>
+                      )}
                       <span className="text-muted-foreground text-xs">{formatMonths(months)}</span>
                     </div>
                   </div>
@@ -403,12 +436,6 @@ export function CandidateMatchCard({
               })}
             </div>
           </div>
-        )}
-
-        {relevantEntries.length === 0 && experience.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {experience.length} experience record{experience.length === 1 ? "" : "s"} on file — none tagged with a relevant field.
-          </p>
         )}
 
         {experience.length === 0 && (

@@ -217,7 +217,7 @@ export function CandidateMatchCard({
     [experience],
   );
   const minExpYears = campaign?.min_experience_years ?? 0;
-  const expMet = yearsExperience >= minExpYears;
+  let expMet = yearsExperience >= minExpYears; // temporary, overridden after field relevance computed
 
   // ── Education helpers ──
   const highestEdu = education.length > 0
@@ -277,6 +277,59 @@ export function CandidateMatchCard({
       : { relevance: "unknown" as const, score: 0.5, explanation: "No field requirement configured" },
     [candidateFields, educationRequiredFields],
   );
+
+  // ── Experience field relevance ──
+  const requiredExperienceFields = useMemo(() => {
+    if (!campaign?.builder) return [];
+    try {
+      const parsed = typeof campaign.builder === 'string' ? JSON.parse(campaign.builder) : campaign.builder;
+      const areas = parsed?.experienceAreas;
+      if (Array.isArray(areas) && areas.length > 0) {
+        return areas.map((a: unknown) => typeof a === 'string' ? a : typeof a === 'object' && a !== null && 'name' in a ? (a as { name: string }).name : null).filter((f): f is string => typeof f === 'string');
+      }
+      // Fall back to job title inference
+      const jobTitle = parsed?.jobTitle || (campaign as any)?.job_title;
+      if (typeof jobTitle === 'string') {
+        const t = jobTitle.toLowerCase();
+        if (t.includes('farm') || t.includes('agricultur')) return ['Farm Operations', 'Agriculture', 'Farming', 'Crop Production'];
+        if (t.includes('nurs')) return ['Clinical', 'Nursing', 'Healthcare'];
+        if (t.includes('account') || t.includes('financ')) return ['Accounting', 'Financial Management'];
+        if (t.includes('logistic') || t.includes('warehouse')) return ['Warehouse', 'Supply Chain', 'Logistics'];
+        if (t.includes('bank') || t.includes('teller')) return ['Retail Banking', 'Customer Service'];
+      }
+    } catch { /* ignore */ }
+    return [];
+  }, [campaign?.builder, (campaign as any)?.job_title]);
+
+  // Check if candidate's work fields are relevant to required experience fields
+  const experienceFieldRelevance = useMemo(() => {
+    if (requiredExperienceFields.length === 0 || relevantEntries.length === 0) {
+      return { relevance: 'unknown' as const, score: 0.5, explanation: 'No experience field requirement configured', hasAnyRelevant: false };
+    }
+    const candidateWorkFields = relevantEntries.map((e) => e.field).filter(Boolean);
+    if (candidateWorkFields.length === 0) {
+      return { relevance: 'unknown' as const, score: 0.5, explanation: 'No field of work specified', hasAnyRelevant: false };
+    }
+    // Check each candidate field against required fields, take the best
+    let bestRelevance: string = 'unrelated';
+    let bestScore = 0;
+    let bestExplanation = '';
+    for (const field of candidateWorkFields) {
+      if (!field) continue;
+      const result = classifyFieldRelevance(field, requiredExperienceFields);
+      if (result.score > bestScore) {
+        bestRelevance = result.relevance;
+        bestScore = result.score;
+        bestExplanation = result.explanation;
+      }
+    }
+    return { relevance: bestRelevance, score: bestScore, explanation: bestExplanation, hasAnyRelevant: bestRelevance !== 'unrelated' };
+  }, [requiredExperienceFields, relevantEntries]);
+
+  // PRD §6: Override expMet when work field is unrelated, regardless of total years
+  if (requiredExperienceFields.length > 0 && experienceFieldRelevance.relevance === "unrelated") {
+    expMet = false;
+  }
 
   // ── Recruiter insight ──
   const insight = useMemo(() => {
@@ -415,6 +468,20 @@ export function CandidateMatchCard({
               </div>
             )}
 
+            {/* Experience field relevance — show when experience has required fields but candidate's work is unrelated */}
+            {minExpYears > 0 && requiredExperienceFields.length > 0 && experienceFieldRelevance.relevance === "unrelated" && (
+              <div className="flex items-start gap-2 text-sm">
+                <GateIcon passed={false} />
+                <div>
+                  <span className="font-medium">Experience Field</span>
+                  <span className="text-muted-foreground"> — {expMet ? "Years met but " : ""}Candidate's work experience is in unrelated fields</span>
+                  <p className="mt-0.5 text-xs text-destructive">
+                    ✕ Fields: {relevantEntries.length > 0 ? relevantEntries.map((e) => e.field).filter(Boolean).join(", ") : "No relevant fields"} — not related to {requiredExperienceFields.join(", ")}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Show required skills eligibility if gates don't cover it */}
             {requiredSkills.length > 0 && !gates.some((g) => g.name.toLowerCase().includes("skill")) && (
               <div className="flex items-start gap-2 text-sm">
@@ -491,6 +558,19 @@ export function CandidateMatchCard({
                 </span>
               </>
             )}
+          </div>
+        )}
+
+        {/* Experience field relevance — show when field is unrelated (regardless of years) */}
+        {minExpYears > 0 && requiredExperienceFields.length > 0 && experienceFieldRelevance.relevance === "unrelated" && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            <CircleX className="size-4 text-destructive" />
+            <div>
+              <span className="text-destructive font-medium">Field relevance: Work experience is not related to required fields</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Candidate fields: {relevantEntries.map((e) => e.field).filter(Boolean).join(", ")} — required: {requiredExperienceFields.join(", ")}
+              </p>
+            </div>
           </div>
         )}
 

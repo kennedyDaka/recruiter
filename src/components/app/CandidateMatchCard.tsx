@@ -48,6 +48,7 @@ interface CampaignInfo {
   min_experience_years?: number;
   required_skills?: string; // JSON string array
   required_certifications?: string; // JSON string array
+  builder?: unknown; // Campaign builder JSON with fieldsOfStudy, etc.
 }
 
 export interface CandidateMatchCardProps {
@@ -227,17 +228,18 @@ export function CandidateMatchCard({
   const eduMet = requiredRank === 0 || eduRank >= requiredRank;
 
   // ── Field relevance for education ──
-  const requiredFields = useMemo(() => parseJsonList(campaign?.required_skills).length > 0 ? [] : [], [campaign?.required_skills]);
-  // For education field relevance, we use the campaign's required fields
-  // which come from the scoring model's education_field groups.
-  // For now, derive from the eligibility gates that mention "field"
+  // Extract required education fields from the campaign builder JSON
   const educationRequiredFields = useMemo(() => {
-    const fieldGate = gates.find((g) => g.name.toLowerCase().includes("field") || g.name.toLowerCase().includes("education"));
-    if (!fieldGate) return [];
-    // Extract field names from the gate reason if it mentions them
-    const match = fieldGate.reason.match(/\[([\s\S]*?)\]/);
-    return match?.[1] ? match[1].split(", ").map((s) => s.trim()) : [];
-  }, [gates]);
+    if (!campaign?.builder) return [];
+    try {
+      const parsed = typeof campaign.builder === 'string' ? JSON.parse(campaign.builder) : campaign.builder;
+      const fields = parsed?.fieldsOfStudy;
+      if (Array.isArray(fields)) {
+        return fields.map((f: unknown) => typeof f === 'string' ? f : typeof f === 'object' && f !== null && 'name' in f ? (f as { name: string }).name : null).filter((f): f is string => typeof f === 'string');
+      }
+    } catch { /* ignore */ }
+    return [];
+  }, [campaign?.builder]);
   const candidateFields = useMemo(
     () => education.map((e) => e.field_of_study).filter((f): f is string => Boolean(f)),
     [education],
@@ -337,15 +339,47 @@ export function CandidateMatchCard({
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Eligibility</h3>
           <div className="grid gap-2">
-            {gates.map((gate) => (
-              <div key={gate.name} className="flex items-start gap-2 text-sm">
-                <GateIcon passed={gate.passed} />
+            {gates.map((gate) => {
+              // Override education gate reason when campaign has min_qualification
+              const isEducationGate = gate.name.toLowerCase().includes("education");
+              const overrideReason = isEducationGate && campaign?.min_qualification && gate.reason.includes("No minimum")
+                ? (eduMet
+                    ? `${highestEdu?.qualification ?? "None"} meets ${campaign.min_qualification} minimum`
+                    : `${highestEdu?.qualification ?? "No qualification"} is below ${campaign.min_qualification} minimum`)
+                : gate.reason;
+              const overridePassed = isEducationGate && campaign?.min_qualification && gate.reason.includes("No minimum")
+                ? eduMet
+                : gate.passed;
+              return (
+                <div key={gate.name} className="flex items-start gap-2 text-sm">
+                  <GateIcon passed={overridePassed} />
+                  <div>
+                    <span className="font-medium">{gate.name}</span>
+                    <span className="text-muted-foreground"> — {overrideReason}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Education eligibility from campaign config (when gate is missing) */}
+            {campaign?.min_qualification && !gates.some((g) => g.name.toLowerCase().includes("education")) && (
+              <div className="flex items-start gap-2 text-sm">
+                {eduMet ? (
+                  <GateIcon passed />
+                ) : (
+                  <GateIcon passed={false} />
+                )}
                 <div>
-                  <span className="font-medium">{gate.name}</span>
-                  <span className="text-muted-foreground"> — {gate.reason}</span>
+                  <span className="font-medium">Education</span>
+                  <span className="text-muted-foreground">
+                    {" — "}
+                    {eduMet
+                      ? `${highestEdu?.qualification ?? "None"} meets ${campaign.min_qualification} minimum`
+                      : `${highestEdu?.qualification ?? "No qualification"} is below ${campaign.min_qualification} minimum`}
+                  </span>
                 </div>
               </div>
-            ))}
+            )}
 
             {/* Show required skills eligibility if gates don't cover it */}
             {requiredSkills.length > 0 && !gates.some((g) => g.name.toLowerCase().includes("skill")) && (
@@ -592,7 +626,7 @@ export function CandidateMatchCard({
                 )}
               </div>
               {/* Field relevance check */}
-              {requiredFields.length > 0 && (
+              {educationRequiredFields.length > 0 && (
                 <div className="flex items-center gap-2">
                   {fieldRelevance.relevance === "exact" || fieldRelevance.relevance === "very_related" || fieldRelevance.relevance === "related" ? (
                     <>

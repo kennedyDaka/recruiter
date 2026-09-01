@@ -531,6 +531,7 @@ function ApplicationDetail() {
                     min_experience_years: (application.campaigns as any)?.min_experience_years,
                     required_skills: (application.campaigns as any)?.required_skills,
                     required_certifications: (application.campaigns as any)?.required_certifications,
+                    builder: (application.campaigns as any)?.builder,
                   }
                 : undefined
             }

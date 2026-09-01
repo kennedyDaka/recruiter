@@ -82,7 +82,7 @@ function JobsPage() {
                 </div>
               </div>
               <Button asChild style={{ backgroundColor: job.tenants?.brand_color || '#2563eb', color: '#fff' }}>
-                <Link to="/apply/$campaignId" params={{ campaignId: job.id }}>
+                <Link to="/apply/$campaignId" params={{ campaignId: (job as any).public_token || job.id }}>
                   Apply
                 </Link>
               </Button>

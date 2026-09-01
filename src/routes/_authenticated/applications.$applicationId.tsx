@@ -30,6 +30,7 @@ import {
 import { DIMENSION_LABELS, type EligibilityGate, type OrsBreakdown } from "@/lib/ors";
 import { CircleCheck, CircleX } from "lucide-react";
 import { AiExtractionTab } from "@/components/app/AiExtractionTab";
+import { CandidateMatchCard } from "@/components/app/CandidateMatchCard";
 
 const STATUSES = [
   "started",
@@ -168,7 +169,7 @@ function ApplicationDetail() {
       // First try the full join query
       const fullRes = await supabase
         .from("applications")
-        .select("*, candidates(*), campaigns(id, name, job_title, builder)")
+        .select("*, candidates(*), campaigns(id, name, job_title, builder, min_qualification, min_experience_years, required_skills, required_certifications)")
         .eq("id", applicationId)
         .maybeSingle();
       if (fullRes.error) {
@@ -511,93 +512,29 @@ function ApplicationDetail() {
     >
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="grid gap-6">
-          <Section title="ORS score">
-            <div className="mb-5 flex flex-wrap items-end gap-3">
-              <span className="font-display text-5xl font-semibold">{application?.score ?? 0}</span>
-              <Badge variant="secondary" className="mb-2">
-                {application?.recommendation ?? "Unscored"}
-              </Badge>
-              <Badge
-                variant={application?.eligibility_status === "eligible" ? "default" : "destructive"}
-                className="mb-2"
-              >
-                {application?.eligibility_status === "eligible" ? "Eligible" : "Not eligible"}
-              </Badge>
-              {recencyYears ? (
-                <Badge variant="outline" className="mb-2">
-                  Recency: last {recencyYears} years
-                </Badge>
-              ) : null}
-            </div>
-
-            {gates.length > 0 ? (
-              <div className="mb-5 grid gap-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Eligibility gates
-                </p>
-                {gates.map((gate) => (
-                  <div key={gate.name} className="flex items-start gap-2 text-sm">
-                    {gate.passed ? (
-                      <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                    ) : (
-                      <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" />
-                    )}
-                    <span>
-                      <span className="font-medium">{gate.name}:</span>{" "}
-                      <span className="text-muted-foreground">{gate.reason}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="grid gap-3">
-              {breakdown
-                .filter((item) => item.max > 0)
-                .map((item) => (
-                  <div key={item.dimension}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span>{item.label ?? DIMENSION_LABELS[item.dimension]}</span>
-                      <span className="text-muted-foreground">
-                        {item.score}/{item.max}
-                      </span>
-                    </div>
-                    <Progress value={(item.score / item.max) * 100} />
-                  </div>
-                ))}
-              {breakdown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No score breakdown recorded.</p>
-              ) : null}
-            </div>
-
-            {reasons.length > 0 ? (
-              <div className="mt-5 border-t border-border pt-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Why this score
-                </p>
-                <ul className="grid gap-1.5 text-sm">
-                  {reasons.map((reason, index) => (
-                    <li key={`${index}-${reason}`} className="flex items-start gap-2">
-                      <span
-                        className={reason.startsWith("\u2713")
-                          ? "text-emerald-600"
-                          : reason.startsWith("\u25b3")
-                            ? "text-amber-600"
-                            : "text-muted-foreground"}
-                      >
-                        {reason.startsWith("\u2713")
-                          ? "\u2713"
-                          : reason.startsWith("\u25b3")
-                            ? "\u25b3"
-                            : "•"}
-                      </span>
-                      <span>{reason.replace(/^[✓△]\s*/, "")}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </Section>
+          <CandidateMatchCard
+            score={application?.score ?? 0}
+            recommendation={application?.recommendation}
+            eligibilityStatus={application?.eligibility_status}
+            gates={gates}
+            breakdown={breakdown}
+            reasons={reasons}
+            yearsExperience={application?.years_experience ?? 0}
+            highestQualification={application?.highest_qualification}
+            education={(data?.education ?? []) as any}
+            experience={(data?.experience ?? []) as any}
+            skills={(data?.skills ?? []) as any}
+            campaign={
+              application?.campaigns
+                ? {
+                    min_qualification: (application.campaigns as any)?.min_qualification,
+                    min_experience_years: (application.campaigns as any)?.min_experience_years,
+                    required_skills: (application.campaigns as any)?.required_skills,
+                    required_certifications: (application.campaigns as any)?.required_certifications,
+                  }
+                : undefined
+            }
+          />
 
           <Tabs defaultValue="profile">
             <TabsList>

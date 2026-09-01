@@ -5,7 +5,7 @@ import { getCurrentSessionFn } from "@/lib/auth/session.functions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Brain, FileText, Globe2, Mail, MessageCircle, Paintbrush, RotateCcw, Send, Upload, Zap } from "lucide-react";
+import { Brain, Cloud, FileText, Globe2, Mail, MessageCircle, Paintbrush, RefreshCcw, RotateCcw, Send, Upload, Zap } from "lucide-react";
 import { getTenantBrandingFn, updateTenantBrandingFn } from "@/lib/branding.functions";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
   DEFAULT_EMAIL_TEMPLATES,
   type EmailTemplateKey,
 } from "@/lib/email-templates";
+import { getR2StatusFn } from "@/lib/storage-status.functions";
 
 // Templates a recruiter can edit in Settings. The account-level
 // `password_reset` template is env-only (no tenant session when it sends).
@@ -683,6 +684,11 @@ function SettingsPage() {
           </div>
         </section>
         ) : null}
+
+        {/* ── R2 Document Storage (admin only) ──────────────────── */}
+        {isAdmin ? (
+        <R2StorageSection />
+        ) : null}
       </div>
     </AppShell>
   );
@@ -821,6 +827,140 @@ function BrandingSection({ queryClient }: { queryClient: ReturnType<typeof useQu
 
             <Button onClick={save}>Save Branding</Button>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function R2StorageSection() {
+  const getStatus = useServerFn(getR2StatusFn);
+  const statusQuery = useQuery({
+    queryKey: ["r2-status"],
+    queryFn: async () => {
+      const result = await getStatus() as {
+        configured: boolean;
+        healthy: boolean;
+        status: string;
+        message: string;
+        bucket: string | null;
+        endpoint?: string;
+        objectCount: number | null;
+        totalSizeBytes: number | null;
+        totalSizeFormatted: string | null;
+      };
+      return result;
+    },
+    staleTime: 30_000,
+  });
+
+  const data = statusQuery.data;
+  const statusColor = !data?.configured
+    ? "text-amber-600"
+    : data.healthy
+      ? "text-emerald-600"
+      : "text-red-600";
+  const statusIcon = !data?.configured
+    ? "⚠️"
+    : data.healthy
+      ? "✅"
+      : "❌";
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div className="grid size-10 place-items-center rounded-lg bg-blue-500 text-white">
+          <Cloud className="size-5" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Document Storage (R2)</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Cloudflare R2 stores CVs, certificates and other uploaded files.
+                When disabled, documents are stored in the database (not recommended for production).
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => statusQuery.refetch()}
+              disabled={statusQuery.isFetching}
+            >
+              <RefreshCcw className={`size-3.5 ${statusQuery.isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {/* Status */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-4">
+              <p className="text-xs font-medium text-muted-foreground">Status</p>
+              <p className={`mt-1 text-sm font-semibold ${statusColor}`}>
+                {statusIcon} {data?.status === "healthy" ? "Connected" : data?.status === "error" ? "Error" : data?.status === "not_configured" ? "Not configured" : "Checking…"}
+              </p>
+              {data?.message ? (
+                <p className="mt-1 text-xs text-muted-foreground break-all">{data.message}</p>
+              ) : null}
+            </div>
+
+            {/* Object count */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-4">
+              <p className="text-xs font-medium text-muted-foreground">Documents in R2</p>
+              <p className="mt-1 text-2xl font-bold">
+                {data?.objectCount !== null && data?.objectCount !== undefined ? data.objectCount.toLocaleString() : "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">files stored</p>
+            </div>
+
+            {/* Total size */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-4">
+              <p className="text-xs font-medium text-muted-foreground">Storage Used</p>
+              <p className="mt-1 text-2xl font-bold">
+                {data?.totalSizeFormatted ?? "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data?.bucket ? `Bucket: ${data.bucket}` : "No bucket configured"}
+              </p>
+            </div>
+          </div>
+
+          {!data?.configured ? (
+            <div className="mt-4 rounded-lg border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-semibold">R2 is not configured</p>
+              <p className="mt-1 leading-6">
+                Add these environment variables to enable Cloudflare R2 storage:
+              </p>
+              <pre className="mt-2 overflow-x-auto rounded bg-amber-100 p-2 text-xs">
+{`R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<your-access-key>
+R2_SECRET_ACCESS_KEY=<your-secret-key>
+R2_BUCKET=operon-documents`}
+              </pre>
+              <p className="mt-2 text-xs">
+                After configuring, run <code>node scripts/migrate-documents-to-r2.cjs</code> to move existing documents.
+              </p>
+            </div>
+          ) : null}
+
+          {data?.configured && data.healthy ? (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+              <p className="font-semibold">✅ R2 storage is active</p>
+              <p className="mt-1 leading-6">
+                New documents are uploaded to Cloudflare R2 and served via signed URLs.
+                Existing base64 documents can be migrated with <code>node scripts/migrate-documents-to-r2.cjs</code>.
+              </p>
+            </div>
+          ) : null}
+
+          {data?.configured && !data.healthy ? (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+              <p className="font-semibold">❌ R2 connection failed</p>
+              <p className="mt-1 leading-6">
+                Check your R2 credentials and bucket name. Documents will fall back to base64 database storage.
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

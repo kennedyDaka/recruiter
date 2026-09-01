@@ -295,7 +295,32 @@ function TaxonomySearch({
             setFocused(true);
             if (query.trim().length >= 2) setOpen(true);
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const trimmed = query.trim();
+              if (onAddNew && trimmed && trimmed !== value) {
+                onAddNew(trimmed);
+                setQuery(trimmed);
+              }
+              setOpen(false);
+            } else if (e.key === "Escape") {
+              const trimmed = query.trim();
+              if (onAddNew && trimmed && trimmed !== value) {
+                onAddNew(trimmed);
+                setQuery(trimmed);
+              }
+              setOpen(false);
+            }
+          }}
           onBlur={() => {
+            // If the user typed text that wasn't selected from the dropdown,
+            // auto-commit it so the field isn't silently empty.
+            const trimmed = query.trim();
+            if (onAddNew && trimmed && trimmed !== value) {
+              onAddNew(trimmed);
+              setQuery(trimmed);
+            }
             setFocused(false);
             setTimeout(() => setOpen(false), 150);
           }}

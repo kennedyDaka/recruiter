@@ -37,29 +37,28 @@ export const Route = createFileRoute("/api/payment/initiate")({
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-          // Campaign must exist and belong to this tenant
-          const campaignRes = await supabaseAdmin
-            .from("campaigns")
-            .select("id, tenant_id, name")
-            .eq("id", data.campaignId)
-            .maybeSingle();
+          // Campaign must exist and belong to this tenant — parallel with plan lookup
+          const amount = data.numDays * DAILY_RATE;
+          const [campaignRes, defaultPlanRes] = await Promise.all([
+            supabaseAdmin
+              .from("campaigns")
+              .select("id, tenant_id, name")
+              .eq("id", data.campaignId)
+              .maybeSingle(),
+            supabaseAdmin
+              .from("plans")
+              .select("id")
+              .eq("active", true)
+              .order("sort_order")
+              .limit(1)
+              .maybeSingle(),
+          ]);
           if (campaignRes.error || !campaignRes.data) {
             return json({ error: "Campaign not found." }, { status: 404 });
           }
           if (campaignRes.data.tenant_id !== tenantId) {
             return json({ error: "Campaign not found." }, { status: 404 });
           }
-
-          const amount = data.numDays * DAILY_RATE;
-
-          // Get the first active plan as FK reference (plans table is legacy, kept for FK)
-          const defaultPlanRes = await supabaseAdmin
-            .from("plans")
-            .select("id")
-            .eq("active", true)
-            .order("sort_order")
-            .limit(1)
-            .maybeSingle();
           const fallbackPlanId = defaultPlanRes.data?.id;
           if (!fallbackPlanId) {
             return json({ error: "No active plan configured" }, { status: 500 });

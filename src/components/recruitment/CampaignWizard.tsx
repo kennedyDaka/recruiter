@@ -618,6 +618,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return FALLBACK_INDUSTRIES;
       return data as { id: string; name: string; slug: string }[];
     },
+    staleTime: 10 * 60 * 1000, // cache for 10 minutes
   });
 
   const industrySlug = industries.data?.find((i) => i.id === builder.industryId)?.slug ?? null;
@@ -633,6 +634,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return FALLBACK_SKILLS;
       return (data ?? []) as { name: string; category: string; industry_slug: string | null }[];
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const certLibrary = useQuery({
@@ -646,6 +648,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return FALLBACK_CERTIFICATIONS;
       return (data ?? []).map((row: any) => row.name as string);
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const licenseLibrary = useQuery({
@@ -658,6 +661,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return FALLBACK_LICENSES;
       return (data ?? []) as { name: string; classes: string[] }[];
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   // Fields of study — one shared catalog (DB, constant as fallback).
@@ -668,6 +672,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return FIELDS_OF_STUDY;
       return [...new Set(((data ?? []) as { name: string }[]).map((row) => row.name))];
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   // Experience areas — the same job-family catalog the role step uses.
@@ -678,6 +683,7 @@ export function CampaignWizard() {
       if (error || !data?.length) return [...new Set(FALLBACK_FAMILIES.map((f) => f.name))];
       return [...new Set(((data ?? []) as { name: string }[]).map((row) => row.name))];
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const relevantSkills = useMemo(() => {

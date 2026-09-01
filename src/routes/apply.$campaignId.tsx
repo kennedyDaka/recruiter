@@ -1896,7 +1896,9 @@ function ApplyPage() {
                           <Field label="Start date" htmlFor={`start-date-${index}`}>
                             <Input
                               id={`start-date-${index}`}
-                              type="date"
+                              type="text"
+                              placeholder="YYYY-MM-DD"
+                              pattern="\d{4}-\d{2}-\d{2}"
                               value={entry.start_date}
                               onChange={(event) =>
                                 updateExperience(index, { start_date: event.target.value })
@@ -1906,7 +1908,9 @@ function ApplyPage() {
                           <Field label="End date" htmlFor={`end-date-${index}`}>
                             <Input
                               id={`end-date-${index}`}
-                              type="date"
+                              type="text"
+                              placeholder="YYYY-MM-DD"
+                              pattern="\d{4}-\d{2}-\d{2}"
                               disabled={entry.is_current}
                               value={entry.is_current ? "" : entry.end_date}
                               onChange={(event) =>

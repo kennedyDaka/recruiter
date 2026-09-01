@@ -48,6 +48,11 @@ import {
   normalizeSkill,
   normalizeIndustry,
 } from "./ors-normalization";
+import {
+  classifyFieldRelevance,
+  classifyEducationRelevance as classifyEducationFieldsRelevance,
+  matchExperienceArea,
+} from "./field-relevance";
 
 // ─── Qualification Levels ───────────────────────────────────────────
 
@@ -292,8 +297,26 @@ function evaluateEligibility(
           passed = true;
           reason = "No minimum qualification set";
         } else if (candidateRank >= requiredRank) {
-          passed = true;
-          reason = `${candidate.highestQualification || "No qualification"} meets the ${requiredName} minimum`;
+          // Level is met — now check field relevance if fields are configured
+          const candidateFields = (candidate.fieldsOfStudy || []).filter(Boolean);
+          if (candidateFields.length > 0 && group.acceptedValues.length > 0) {
+            const fieldResult = classifyEducationFieldsRelevance(candidateFields, group.acceptedValues);
+            if (fieldResult.relevance === "unrelated") {
+              // Higher level but WRONG field — PRD Rule: not eligible
+              passed = false;
+              reason = `${candidate.highestQualification} level meets requirement, but field (${candidateFields.join(", ")}) is not relevant to ${group.acceptedValues.join(", ")}`;
+            } else if (fieldResult.relevance === "weakly_related") {
+              // Partially relevant — flag for review
+              passed = group.state !== "required";
+              reason = `${candidate.highestQualification} level meets requirement, but field (${candidateFields.join(", ")}) is only weakly related`;
+            } else {
+              passed = true;
+              reason = `${candidate.highestQualification} in ${candidateFields.join(", ")} — ${fieldResult.explanation}`;
+            }
+          } else {
+            passed = true;
+            reason = `${candidate.highestQualification || "No qualification"} meets the ${requiredName} minimum`;
+          }
         } else {
           passed = false;
           reason = `Requires ${requiredName}; candidate has ${candidate.highestQualification || "no qualification"}`;
@@ -313,15 +336,24 @@ function evaluateEligibility(
             passed = group.state !== "required";
             reason = "No field of study information provided";
           } else {
-            let bestMatch = 0;
-            for (const field of fields) {
-              const { ratio } = valueMatchesAny(field, group.acceptedValues);
-              bestMatch = Math.max(bestMatch, ratio);
+            // Use the field relevance taxonomy for smarter matching
+            const fieldResult = classifyEducationFieldsRelevance(fields, group.acceptedValues);
+            if (fieldResult.relevance === "exact" || fieldResult.relevance === "very_related") {
+              passed = true;
+              reason = fieldResult.explanation;
+            } else if (fieldResult.relevance === "related") {
+              passed = true;
+              reason = fieldResult.explanation;
+            } else if (fieldResult.relevance === "weakly_related") {
+              // Weak — acceptable for preferred, triggers review for required
+              passed = group.state !== "required";
+              reason = fieldResult.explanation;
+              if (!passed) hasUnknown = true;
+            } else {
+              // Unrelated
+              passed = false;
+              reason = fieldResult.explanation;
             }
-            passed = bestMatch >= 0.5;
-            reason = passed
-              ? "Field of study matches one of the accepted areas"
-              : `Field of study doesn't match any accepted area`;
           }
         }
         break;
@@ -330,7 +362,13 @@ function evaluateEligibility(
       case "experience_area": {
         const minYears = group.minYears || 0;
         const entries = candidate.experienceEntries || [];
-        const { totalYears } = calculateRelevantYears(entries, group.acceptedValues);
+        const { totalYears, entries: relevantEntries } = calculateRelevantYears(entries, group.acceptedValues);
+
+        // Calculate total years across ALL entries (including non-relevant)
+        let allYears = 0;
+        for (const e of entries) {
+          allYears += e.years || estimateYears(e.startDate, e.endDate, e.isCurrent);
+        }
 
         if (entries.length === 0) {
           // Unknown — triggers review
@@ -338,15 +376,21 @@ function evaluateEligibility(
           passed = group.state !== "required";
           reason = "No experience information provided";
         } else if (group.acceptedValues.length === 0) {
-          passed = totalYears >= minYears;
+          // No specific areas — all experience counts
+          passed = allYears >= minYears;
           reason = passed
-            ? `${Math.round(totalYears)} years meets the ${minYears} year minimum`
-            : `Requires ${minYears} years; candidate has ${Math.round(totalYears)}`;
+            ? `${Math.round(allYears)} years meets the ${minYears} year minimum`
+            : `Requires ${minYears} years; candidate has ${Math.round(allYears)}`;
         } else {
+          // PRD Rule: only count RELEVANT experience, show total separately
           passed = totalYears >= minYears;
-          reason = passed
-            ? `${Math.round(totalYears)} years in relevant areas meets the ${minYears} year minimum`
-            : `Requires ${minYears} years in relevant areas; candidate has ${Math.round(totalYears)}`;
+          const relevantNames = [...new Set(relevantEntries.map((e) => e.title || e.field).filter(Boolean))];
+          if (passed) {
+            reason = `${Math.round(totalYears)} years relevant (${relevantNames.join(", ") || "matched areas"}) meets the ${minYears} year minimum`;
+          } else {
+            const totalInfo = allYears !== totalYears ? `${Math.round(allYears)} total` : "";
+            reason = `Requires ${minYears} years in ${group.acceptedValues.join(", ")}; candidate has ${Math.round(totalYears)} years relevant${totalInfo ? ` (${totalInfo})` : ""}`;
+          }
         }
         break;
       }

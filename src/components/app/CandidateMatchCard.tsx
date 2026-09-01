@@ -15,6 +15,7 @@ import {
   type EligibilityGate,
   type OrsBreakdown,
 } from "@/lib/ors";
+import { classifyFieldRelevance } from "@/lib/field-relevance";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -224,6 +225,29 @@ export function CandidateMatchCard({
   const eduRank = highestEdu ? qualificationRank(highestEdu.qualification) : 0;
   const requiredRank = campaign?.min_qualification ? qualificationRank(campaign.min_qualification) : 0;
   const eduMet = requiredRank === 0 || eduRank >= requiredRank;
+
+  // ── Field relevance for education ──
+  const requiredFields = useMemo(() => parseJsonList(campaign?.required_skills).length > 0 ? [] : [], [campaign?.required_skills]);
+  // For education field relevance, we use the campaign's required fields
+  // which come from the scoring model's education_field groups.
+  // For now, derive from the eligibility gates that mention "field"
+  const educationRequiredFields = useMemo(() => {
+    const fieldGate = gates.find((g) => g.name.toLowerCase().includes("field") || g.name.toLowerCase().includes("education"));
+    if (!fieldGate) return [];
+    // Extract field names from the gate reason if it mentions them
+    const match = fieldGate.reason.match(/\[([\s\S]*?)\]/);
+    return match?.[1] ? match[1].split(", ").map((s) => s.trim()) : [];
+  }, [gates]);
+  const candidateFields = useMemo(
+    () => education.map((e) => e.field_of_study).filter((f): f is string => Boolean(f)),
+    [education],
+  );
+  const fieldRelevance = useMemo(
+    () => candidateFields.length > 0 && educationRequiredFields.length > 0
+      ? classifyFieldRelevance(candidateFields[0] ?? "", educationRequiredFields)
+      : { relevance: "unknown" as const, score: 0.5, explanation: "No field requirement configured" },
+    [candidateFields, educationRequiredFields],
+  );
 
   // ── Recruiter insight ──
   const insight = useMemo(() => {
@@ -550,19 +574,43 @@ export function CandidateMatchCard({
             ))}
           </div>
           {campaign?.min_qualification && (
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              {eduMet ? (
-                <>
-                  <CircleCheck className="size-3.5 text-emerald-600" />
-                  <span className="text-emerald-600">Meets minimum ({campaign.min_qualification})</span>
-                </>
-              ) : (
-                <>
-                  <CircleX className="size-3.5 text-destructive" />
-                  <span className="text-destructive">
-                    Below minimum ({highestEdu?.qualification ?? "None"} vs {campaign.min_qualification})
-                  </span>
-                </>
+            <div className="mt-2 grid gap-1.5 text-xs">
+              {/* Level check */}
+              <div className="flex items-center gap-2">
+                {eduMet ? (
+                  <>
+                    <CircleCheck className="size-3.5 text-emerald-600" />
+                    <span className="text-emerald-600 font-medium">Level: {highestEdu?.qualification ?? "None"} meets {campaign.min_qualification} minimum</span>
+                  </>
+                ) : (
+                  <>
+                    <CircleX className="size-3.5 text-destructive" />
+                    <span className="text-destructive font-medium">
+                      Level: {highestEdu?.qualification ?? "None"} is below {campaign.min_qualification} minimum
+                    </span>
+                  </>
+                )}
+              </div>
+              {/* Field relevance check */}
+              {requiredFields.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {fieldRelevance.relevance === "exact" || fieldRelevance.relevance === "very_related" || fieldRelevance.relevance === "related" ? (
+                    <>
+                      <CircleCheck className="size-3.5 text-emerald-600" />
+                      <span className="text-emerald-600">Field: {fieldRelevance.explanation}</span>
+                    </>
+                  ) : fieldRelevance.relevance === "weakly_related" ? (
+                    <>
+                      <WarningIcon />
+                      <span className="text-amber-600">Field: {fieldRelevance.explanation}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CircleX className="size-3.5 text-destructive" />
+                      <span className="text-destructive">Field: {fieldRelevance.explanation}</span>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           )}

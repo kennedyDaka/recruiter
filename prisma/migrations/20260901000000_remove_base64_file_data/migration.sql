@@ -1,16 +1,11 @@
--- Migration: Remove base64 file_data from candidate_documents
+-- Migration: Retain file_data column for base64 fallback
 -- 
--- PREREQUISITE: Run the bulk re-upload script first to move all
--- existing base64 documents to Cloudflare R2.
--- 
--- This migration removes the file_data column which stored documents
--- as base64 in the database. Documents are now stored in Cloudflare R2
--- and only the file_path (R2 key) is kept in the database.
+-- Previously this migration was planned to drop file_data after migrating
+-- all documents to R2. However, file_data is still needed as a fallback
+-- when R2 is not configured (local development, staging environments).
 --
--- DO NOT RUN until:
--- 1. R2 bucket is created and configured
--- 2. R2 env vars are set on Vercel
--- 3. Bulk re-upload script has been run successfully
--- 4. All documents have been verified accessible via R2 signed URLs
-
-ALTER TABLE candidate_documents DROP COLUMN IF EXISTS file_data;
+-- The column is retained. When R2 is configured, file_data is set to NULL
+-- by uploadApplicationDocument and only file_path (the R2 key) is stored.
+-- When R2 is NOT configured, file_data holds the base64-encoded file content.
+--
+-- This migration is now a no-op.

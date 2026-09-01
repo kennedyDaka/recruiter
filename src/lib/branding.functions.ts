@@ -44,8 +44,36 @@ export const updateTenantBrandingFn = createServerFn({ method: "POST" })
     let idx = 1;
 
     if (data.logoData !== undefined) {
+      // Upload to R2 if configured and data is a base64 data URL
+      let logoUrl: string | null = null;
+      let logoData: string | null = data.logoData || null;
+      if (data.logoData && data.logoData.startsWith("data:")) {
+        try {
+          const { uploadLogoFn } = await import("@/lib/upload-logo.functions");
+          const result = await uploadLogoFn({
+            data: {
+              base64DataUrl: data.logoData,
+              tenantId: context.tenantId,
+              fileName: "logo",
+            },
+          });
+          if (result && typeof result === "object" && "url" in result) {
+            const r = result as { url: string; provider: string };
+            if (r.provider === "r2" && r.url && !r.url.startsWith("data:")) {
+              logoUrl = r.url;
+              logoData = null; // Don't store base64 in DB when R2 is used
+            }
+          }
+        } catch {
+          // Fall through to store base64 in DB
+        }
+      }
+      if (logoUrl) {
+        sets.push(`logo_url = $${idx++}`);
+        args.push(logoUrl);
+      }
       sets.push(`logo_data = $${idx++}`);
-      args.push(data.logoData || null);
+      args.push(logoData);
     }
     if (data.brandColor !== undefined) {
       sets.push(`brand_color = $${idx++}`);

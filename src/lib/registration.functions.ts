@@ -60,6 +60,31 @@ export const registerCompany = createServerFn({ method: "POST" })
     const taken = await supabaseAdmin.from("tenants").select("id").eq("slug", slug).maybeSingle();
     if (taken.data) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
 
+    // Upload logo to R2 if configured, otherwise store base64 in DB
+    let logoUrl = data.logoUrl || null;
+    let logoData = data.logoData || null;
+    if (data.logoData && data.logoData.startsWith("data:")) {
+      try {
+        const { uploadLogoFn } = await import("@/lib/upload-logo.functions");
+        const result = await uploadLogoFn({
+          data: {
+            base64DataUrl: data.logoData,
+            tenantId: "pending", // Will be replaced after tenant creation
+            fileName: "logo",
+          },
+        });
+        if (result && typeof result === "object" && "url" in result) {
+          const r = result as { url: string; provider: string };
+          if (r.provider === "r2" && r.url && !r.url.startsWith("data:")) {
+            logoUrl = r.url;
+            logoData = null; // Don't store base64 in DB when R2 is used
+          }
+        }
+      } catch {
+        // Fall through to store base64 in DB
+      }
+    }
+
     const { settingsJsonForRegistration } = await import("@/lib/settings.functions");
     const settings = settingsJsonForRegistration({
       autoPipelineEnabled: data.autoPipelineEnabled,
@@ -78,8 +103,8 @@ export const registerCompany = createServerFn({ method: "POST" })
         phone: data.phone || null,
         email: data.email,
         website: data.website || null,
-        logo_url: data.logoUrl || null,
-        logo_data: data.logoData || null,
+        logo_url: logoUrl,
+        logo_data: logoData,
         brand_color: data.brandColor || "#2563eb",
         brand_font: data.brandFont || "Inter",
         settings: settings,

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { uploadDocument, getDocumentUrl, isR2Configured, getMimeType } from "@/lib/storage";
+import { uploadDocument, getDocumentUrl, isR2Configured, getMimeType, deleteDocument } from "@/lib/storage";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -10,6 +10,7 @@ const uploadSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .min(1)
     .max(200),
+  tenantId: z.string().min(1).max(100).optional().default("public"),
   docType: z.string().trim().min(1).max(80),
   fileName: z.string().trim().min(1).max(255),
   base64: z.string().trim().min(1).max(16_000_000),
@@ -29,13 +30,13 @@ export const uploadApplicationDocument = createServerFn({ method: "POST" })
     // Resolve campaign: try public_token first, then id
     let campaignRes = await supabaseAdmin
       .from("campaigns")
-      .select("id")
+      .select("id, tenant_id")
       .eq("public_token", data.campaignId)
       .maybeSingle();
     if (!campaignRes.data) {
       campaignRes = await supabaseAdmin
         .from("campaigns")
-        .select("id")
+        .select("id, tenant_id")
         .eq("id", data.campaignId)
         .maybeSingle();
     }
@@ -48,20 +49,21 @@ export const uploadApplicationDocument = createServerFn({ method: "POST" })
       throw new Error("The uploaded file exceeds the 10 MB limit.");
     }
 
+    // Use the tenant ID from the campaign for proper R2 key isolation
+    const tenantId = campaignRes.data.tenant_id || data.tenantId;
+
     // Upload to R2 if configured, otherwise store base64 in DB
     const { key, provider } = await uploadDocument({
-      tenantId: "public",
+      tenantId,
       campaignId: data.campaignId,
       fileName: data.fileName,
       buffer,
     });
 
-    const storagePath = `${data.campaignId}/${key}`;
-
     return {
       doc_type: data.docType,
       file_name: data.fileName,
-      file_path: storagePath,
+      file_path: key,
       file_size: buffer.byteLength,
       // Only store base64 data when R2 is NOT configured (fallback)
       file_data: provider === "base64" ? data.base64 : null,
@@ -86,10 +88,9 @@ export const applicationDocumentUrl = createServerFn({ method: "POST" })
     if (doc.error) throw new Error(doc.error.message);
     if (!doc.data) throw new Error("Document not found.");
 
-    // Try R2 first — the key is the part after the campaign ID prefix
+    // Try R2 first — the file_path IS the R2 storage key
     if (isR2Configured() && doc.data.file_path) {
-      const r2Key = doc.data.file_path.replace(/^[^/]+\//, "");
-      const signedUrl = await getDocumentUrl(r2Key);
+      const signedUrl = await getDocumentUrl(doc.data.file_path);
       if (signedUrl) {
         return {
           signedUrl,
@@ -110,4 +111,23 @@ export const applicationDocumentUrl = createServerFn({ method: "POST" })
     }
 
     throw new Error("Document file not found in storage.");
+  });
+
+/**
+ * Deletes a document from R2 storage and returns true.
+ * Best-effort — does not throw on failure.
+ */
+export const deleteApplicationDocument = createServerFn({ method: "POST" })
+  .validator(
+    (input: unknown) =>
+      z.object({ filePath: z.string().trim().min(1).max(500) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    if (!isR2Configured()) return { deleted: false };
+    try {
+      await deleteDocument(data.filePath);
+      return { deleted: true };
+    } catch {
+      return { deleted: false };
+    }
   });

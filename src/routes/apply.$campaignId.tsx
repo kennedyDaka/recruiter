@@ -81,6 +81,7 @@ type CampaignBranding = {
 
 type CampaignSummary = {
   id: string;
+  tenant_id: string;
   name: string | null;
   job_title: string | null;
   location: string | null;
@@ -1156,6 +1157,7 @@ function ApplyPage() {
         const uploaded = await uploadDocument({
           data: {
             campaignId,
+            tenantId: (campaign as any)?.tenant_id ?? "public",
             docType,
             fileName: file.name,
             base64: await fileToBase64(file),

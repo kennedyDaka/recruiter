@@ -12,7 +12,7 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
 
     // Try public_token first, then fall back to id — fetch tenant-level branding
     let campaign = await dbQueryFirst(
-      `SELECT c.id, c.name, c.job_title, c.location, c.employment_type,
+      `SELECT c.id, c.tenant_id, c.name, c.job_title, c.location, c.employment_type,
               c.job_description, c.responsibilities, c.required_skills,
               c.required_certifications, c.required_documents, c.min_qualification,
               c.min_experience_years, c.salary_min, c.salary_max, c.salary_currency,
@@ -27,7 +27,7 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
 
     if (!campaign) {
       campaign = await dbQueryFirst(
-        `SELECT c.id, c.name, c.job_title, c.location, c.employment_type,
+        `SELECT c.id, c.tenant_id, c.name, c.job_title, c.location, c.employment_type,
                 c.job_description, c.responsibilities, c.required_skills,
                 c.required_certifications, c.required_documents, c.min_qualification,
                 c.min_experience_years, c.salary_min, c.salary_max, c.salary_currency,
@@ -50,6 +50,7 @@ export const getPublicCampaignFn = createServerFn({ method: "GET" })
 
     return {
       id: campaign.id,
+      tenant_id: campaign.tenant_id,
       name: campaign.name,
       job_title: campaign.job_title,
       location: campaign.location,

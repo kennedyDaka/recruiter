@@ -156,6 +156,49 @@ export interface StorageUploadResult {
 }
 
 /**
+ * Download a file from storage as a Buffer.
+ * - CF API mode: fetches via public URL
+ * - S3 mode: GetObjectCommand
+ * - No config: returns null (caller uses base64 from DB)
+ */
+export async function downloadDocument(key: string): Promise<Buffer | null> {
+  const config = getConfig();
+  if (!config) return null;
+
+  if (config.mode === "cf-api") {
+    try {
+      const url = `${config.publicUrl.replace(/\/$/, "")}/${key}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const arrayBuffer = await res.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch {
+      return null;
+    }
+  }
+
+  if (config.mode === "s3") {
+    try {
+      const { GetObjectCommand } = require("@aws-sdk/client-s3");
+      const client = getS3Client(config);
+      const result = await withRetry(() =>
+        client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key })),
+      ) as { Body?: { transformToByteArray?: () => Promise<Uint8Array> } };
+      const stream = result.Body;
+      if (stream && typeof stream.transformToByteArray === "function") {
+        const bytes = await stream.transformToByteArray();
+        return Buffer.from(bytes);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Upload a file to storage.
  */
 export async function uploadDocument(params: {
@@ -265,6 +308,42 @@ export async function getDocumentUrl(key: string): Promise<string | null> {
   }
 
   return null;
+}
+
+/**
+ * Check if a document exists in storage.
+ */
+/**
+ * Delete a document from storage.
+ * - CF API mode: DELETE via Cloudflare API
+ * - S3 mode: DeleteObjectCommand
+ * - No config: no-op (base64 data lives in DB only)
+ */
+export async function deleteDocument(key: string): Promise<void> {
+  const config = getConfig();
+  if (!config) return;
+
+  if (config.mode === "cf-api") {
+    try {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${encodeURIComponent(key)}`;
+      await fetch(url, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${config.apiToken}` },
+      });
+    } catch {
+      // Best-effort — delete failures should not block the caller.
+    }
+  }
+
+  if (config.mode === "s3") {
+    try {
+      const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+      const client = getS3Client(config);
+      await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+    } catch {
+      // Best-effort
+    }
+  }
 }
 
 /**

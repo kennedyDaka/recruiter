@@ -490,6 +490,28 @@ export const submitApplication = createServerFn({ method: "POST" })
         "candidate_referees",
         "candidate_answers",
       ]) {
+        // For candidate_documents, clean up R2 objects before deleting DB rows
+        if (table === "candidate_documents") {
+          try {
+            const { supabaseAdmin: sa } = await import("@/integrations/supabase/client.server");
+            const oldDocs = await sa
+              .from("candidate_documents")
+              .select("file_path")
+              .eq("application_id", applicationId);
+            if (oldDocs.data && oldDocs.data.length > 0) {
+              const { isR2Configured, deleteDocument } = await import("@/lib/storage");
+              if (isR2Configured()) {
+                for (const doc of oldDocs.data) {
+                  if (doc.file_path) {
+                    await deleteDocument(doc.file_path);
+                  }
+                }
+              }
+            }
+          } catch {
+            // Best-effort cleanup — don't block resubmission
+          }
+        }
         const removed = await supabaseAdmin
           .from(table)
           .delete()
@@ -646,21 +668,37 @@ export const submitApplication = createServerFn({ method: "POST" })
     // submission is already complete — this is fire-and-forget.
     try {
       const cvDocument = data.documents.find(
-        (d) => d.doc_type.toLowerCase() === "cv" && d.file_data,
+        (d) => d.doc_type.toLowerCase() === "cv",
       );
-      if (cvDocument?.file_data) {
+      if (cvDocument) {
         const { requestAiCvProcessing } = await import("@/lib/ai/service");
         const requiredSkills = parseJsonList(campaign.required_skills);
         const jobTitle = campaign.job_title as string | undefined;
-        await requestAiCvProcessing({
-          tenantId,
-          applicationId,
-          candidateId,
-          pdfBase64: cvDocument.file_data,
-          fileName: cvDocument.file_name,
-          ...(jobTitle ? { jobTitle } : {}),
-          ...(requiredSkills.length > 0 ? { requiredSkills } : {}),
-        });
+
+        // Prefer base64 from DB, but download from R2 if not available
+        let pdfBase64 = cvDocument.file_data || undefined;
+        let pdfBuffer: Buffer | undefined;
+        if (!pdfBase64 && cvDocument.file_path) {
+          try {
+            const { downloadDocument } = await import("@/lib/storage");
+            const downloaded = await downloadDocument(cvDocument.file_path);
+            if (downloaded) pdfBuffer = downloaded;
+          } catch {
+            // Best-effort — skip AI if download fails
+          }
+        }
+
+        if (pdfBase64 || pdfBuffer) {
+          await requestAiCvProcessing({
+            tenantId,
+            applicationId,
+            candidateId,
+            ...(pdfBuffer ? { pdfBuffer } : { pdfBase64 }),
+            fileName: cvDocument.file_name,
+            ...(jobTitle ? { jobTitle } : {}),
+            ...(requiredSkills.length > 0 ? { requiredSkills } : {}),
+          });
+        }
       }
     } catch {
       // Best-effort — AI failure must never block a submission.

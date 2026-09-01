@@ -20,8 +20,9 @@ model Tenant {
   currency        String?
   phone           String?
   email           String?
-  website         String?
+  website        String?
   logo_url        String?
+  logo_data       String?  // Base64-encoded logo stored in DB (used when R2 is not configured)
   settings        String?  // JSON: tenant-level config (auto-pipeline, email, whatsapp, distribution)
   primary_color   String   @default("#0f766e")
   secondary_color String   @default("#1e293b")

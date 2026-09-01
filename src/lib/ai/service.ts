@@ -49,7 +49,7 @@ export interface AiCvProcessingRequest {
   candidateId: string;
   documentId?: string;
   pdfBuffer?: Buffer;
-  pdfBase64?: string;
+  pdfBase64?: string | undefined;
   fileName?: string;
   /** Optional context for improved extraction */
   jobTitle?: string;

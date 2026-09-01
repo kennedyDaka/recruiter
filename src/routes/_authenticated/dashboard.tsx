@@ -114,22 +114,49 @@ function Dashboard() {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="font-display text-base font-semibold">Top scoring applications</h2>
+          <h2 className="font-display text-base font-semibold">Recent applications</h2>
           <div className="mt-4 space-y-3">
             {applications.map((application: any) => (
               <Link
                 key={application.id}
                 to="/applications/$applicationId"
                 params={{ applicationId: application.id }}
-                className="flex items-center justify-between rounded-lg border border-border/70 px-4 py-3 text-sm transition-colors hover:bg-accent"
+                className="flex flex-col gap-1.5 rounded-lg border border-border/70 px-4 py-3 text-sm transition-colors hover:bg-accent"
               >
-                <span>
-                  <span className="font-medium">{application.reference}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {application.recommendation ?? "Pending review"}
-                  </span>
-                </span>
-                <span className="font-display text-lg font-semibold">{application.score}</span>
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">
+                        {application.first_name && application.last_name
+                          ? `${application.first_name} ${application.last_name}`
+                          : application.reference}
+                      </span>
+                      <span className="font-display text-lg font-semibold shrink-0">{application.score ?? "—"}</span>
+                    </div>
+                    <span className="block text-xs text-muted-foreground">
+                      {application.recommendation ?? "Pending review"}
+                      {application.campaign_title ? ` · ${application.campaign_title}` : ""}
+                    </span>
+                  </div>
+                </div>
+                {(application.email || application.phone || application.location || (application.skills?.length > 0)) ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {application.email ? (
+                      <span className="truncate max-w-[180px]">{application.email}</span>
+                    ) : null}
+                    {application.phone ? (
+                      <span>{application.phone}</span>
+                    ) : null}
+                    {application.location ? (
+                      <span className="truncate max-w-[140px]">{application.location}</span>
+                    ) : null}
+                    {application.skills?.length > 0 ? (
+                      <span>
+                        {application.skills.length} skill{application.skills.length === 1 ? "" : "s"}: {application.skills.slice(0, 3).join(", ")}{application.skills.length > 3 ? " +" + (application.skills.length - 3) : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </Link>
             ))}
             {applications.length === 0 && !isLoading ? (

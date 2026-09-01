@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";  import {
   qualificationRank,
   scoreApplication,
   yearsFromExperience,
   yearsOptionFor,
   type OrsWeights,
   type OrsThresholds,
+  type OrsResult,
   type ScoredQuestion,
 } from "@/lib/ors";
 import { scoreApplicationV2 } from "@/lib/ors-scoring-v2";
@@ -341,7 +341,7 @@ export const submitApplication = createServerFn({ method: "POST" })
 
     // Use v2 requirement-based scoring when scoring_model is present on the campaign.
     // Falls back to v1 flat scoring for legacy campaigns.
-    let scored;
+    let scored: OrsResult | undefined;
     const scoringModelRaw = (campaign as any).scoring_model;
     if (scoringModelRaw) {
       try {
@@ -349,25 +349,25 @@ export const submitApplication = createServerFn({ method: "POST" })
           ? JSON.parse(scoringModelRaw)
           : scoringModelRaw;
         const candidateInput: CandidateScoringInput = {
-          highestQualification: highest || undefined,
+          highestQualification: highest || undefined as any,
           fieldsOfStudy: data.education.map((e) => e.field_of_study).filter(Boolean),
           yearsExperience: Math.round(years),
           experienceEntries: data.experience.map((entry) => ({
             title: entry.position,
-            field: entry.field || undefined,
+            field: entry.field || "",
             years: entry.start_date
               ? Math.round(yearsFromExperience([entry as any]) * 10) / 10
-              : undefined,
-            startDate: entry.start_date ?? undefined,
-            endDate: entry.end_date ?? undefined,
+              : 0,
+            startDate: entry.start_date ?? "",
+            endDate: entry.end_date ?? "",
             isCurrent: entry.is_current,
           })),
           skills: data.skills.map((s) => s.skill),
           certifications: certificationsHeld,
-          country: data.personal.country || undefined,
-          industry: industryFromBuilder(campaign.builder),
+          country: data.personal.country || "",
+          industry: industryFromBuilder(campaign.builder) || undefined,
           answers,
-        };
+        } as CandidateScoringInput;
         const v2Result = scoreApplicationV2(scoringModel, candidateInput);
         // Map v2 result to v1-compatible OrsResult shape for downstream consumers
         scored = {
@@ -843,7 +843,7 @@ export async function rescoreCampaignCore(campaignId: string): Promise<{
       ];
 
       // v2 scoring path when scoring_model is present
-      let scored;
+      let scored: OrsResult | undefined;
       const scoringModelRaw2 = (campaign as any).scoring_model;
       if (scoringModelRaw2) {
         try {
@@ -851,23 +851,23 @@ export async function rescoreCampaignCore(campaignId: string): Promise<{
             ? JSON.parse(scoringModelRaw2)
             : scoringModelRaw2;
           const candidateInput2: CandidateScoringInput = {
-            highestQualification: highest || undefined,
+            highestQualification: highest || undefined as any,
             fieldsOfStudy: education.map((e) => e.field_of_study ?? "").filter(Boolean),
             yearsExperience: Math.round(years),
             experienceEntries: experience.map((e) => ({
               title: e.position,
-              field: e.field ?? undefined,
-              years: e.start_date ? Math.round(yearsFromExperience([e as any]) * 10) / 10 : undefined,
-              startDate: e.start_date ?? undefined,
-              endDate: e.end_date ?? undefined,
+              field: e.field || "",
+              years: e.start_date ? Math.round(yearsFromExperience([e as any]) * 10) / 10 : 0,
+              startDate: e.start_date ?? "",
+              endDate: e.end_date ?? "",
               isCurrent: Boolean(e.is_current),
             })),
             skills: skills.map((s) => s.skill),
             certifications: certificationsHeld,
-            country: candidate?.country ?? undefined,
-            industry: industryFromBuilder(campaign.builder),
+            country: candidate?.country || "",
+            industry: industryFromBuilder(campaign.builder) || undefined,
             answers,
-          };
+          } as CandidateScoringInput;
           const v2Result2 = scoreApplicationV2(scoringModel2, candidateInput2);
           scored = {
             total: v2Result2.total,

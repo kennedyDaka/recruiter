@@ -25,9 +25,37 @@ export const getDashboardFn = createServerFn({ method: "GET" }).handler(
     );
 
     const applications = await dbQuery(
-      "SELECT a.id, a.reference, a.score, a.recommendation, a.status, a.created_at, a.campaign_id FROM applications a JOIN campaigns c ON a.campaign_id = c.id WHERE c.tenant_id = $1 ORDER BY a.score DESC LIMIT 8",
+      `SELECT a.id, a.reference, a.score, a.recommendation, a.status, a.created_at,
+              a.campaign_id, a.highest_qualification, a.years_experience,
+              c.first_name, c.last_name, c.email, c.phone, c.location,
+              cam.job_title AS campaign_title
+       FROM applications a
+       JOIN campaigns cam ON a.campaign_id = cam.id
+       LEFT JOIN candidates c ON a.candidate_id = c.id
+       WHERE cam.tenant_id = $1
+       ORDER BY a.score DESC
+       LIMIT 12`,
       [tenantId],
     );
+
+    // Fetch skills for the returned applications
+    if (applications.length > 0) {
+      const appIds = applications.map((a: any) => a.id);
+      const skillsRows = await dbQuery(
+        `SELECT application_id, skill FROM candidate_skills
+         WHERE application_id = ANY($1)`,
+        [appIds],
+      );
+      const skillsMap = new Map<string, string[]>();
+      for (const row of skillsRows as any[]) {
+        const list = skillsMap.get(row.application_id) ?? [];
+        list.push(row.skill);
+        skillsMap.set(row.application_id, list);
+      }
+      for (const app of applications) {
+        (app as any).skills = skillsMap.get(app.id) ?? [];
+      }
+    }
 
     return { campaigns, applications };
   },

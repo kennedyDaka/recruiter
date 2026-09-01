@@ -215,6 +215,37 @@ function toTitleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Format a phone number as the user types.
+ * Keeps the leading + and country code intact, then groups local
+ * digits in blocks of 3 separated by spaces.
+ * e.g. "+265991234567" → "+265 991 234 567"
+ */
+function formatPhone(value: string, countryCode?: string): string {
+  if (!value) return "";
+  // If user is still typing the + or code prefix, pass through
+  const dialCode = countryCode ? DIAL_CODES[countryCode] : undefined;
+  const digitsOnly = value.replace(/[^\d+]/g, "");
+  if (!digitsOnly.startsWith("+")) {
+    // No leading + yet — just strip non-digits and let them type
+    return digitsOnly.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+  }
+  const plusDigits = digitsOnly;
+  // Split into code and local parts
+  if (dialCode && plusDigits.startsWith(dialCode)) {
+    const local = plusDigits.slice(dialCode.length).replace(/\D/g, "");
+    if (!local) return dialCode + " ";
+    const grouped = local.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+    return dialCode + " " + grouped;
+  }
+  // Unknown code or partial code — just group all digits after +
+  const afterPlus = plusDigits.slice(1).replace(/\D/g, "");
+  const codeEnd = afterPlus.length > 3 ? afterPlus.slice(0, 3) : afterPlus;
+  const localPart = afterPlus.length > 3 ? afterPlus.slice(3) : "";
+  const grouped = localPart ? " " + localPart.replace(/(\d{3})(?=\d)/g, "$1 ").trim() : "";
+  return "+" + codeEnd + grouped;
+}
+
 const APPLICATION_CONSENT_VERSION = "2026-08-14";
 
 const emptyPersonalForm = (): PersonalForm => ({
@@ -1405,7 +1436,7 @@ function ApplyPage() {
                           maxLength={40}
                           placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
                           value={form.phone}
-                          onChange={(event) => set("phone")(event.target.value)}
+                          onChange={(event) => set("phone")(formatPhone(event.target.value, form.country))}
                         />
                       </Field>
                       <Field label="City" htmlFor="city">
@@ -1746,9 +1777,9 @@ function ApplyPage() {
                                   }}
                                 >
                                   <span className="font-medium">{entry.name}</span>
-                                  {entry.full_name ? (
+                                  {entry.category ? (
                                     <span className="text-xs text-muted-foreground">
-                                      {entry.full_name}
+                                      {entry.category}
                                     </span>
                                   ) : null}
                                 </button>
@@ -2028,7 +2059,7 @@ function ApplyPage() {
                               placeholder={DIAL_CODES[form.country] ?? '+265 991 234 567'}
                               value={entry.phone}
                               onChange={(event) =>
-                                updateReferee(index, { phone: event.target.value })
+                                updateReferee(index, { phone: formatPhone(event.target.value, form.country) })
                               }
                             />
                           </Field>

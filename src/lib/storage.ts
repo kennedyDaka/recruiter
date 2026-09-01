@@ -1,58 +1,76 @@
 /**
  * Document Storage Abstraction Layer.
  *
- * Supports:
- *   - Cloudflare R2 (S3-compatible) — primary storage for production
- *   - Base64 in DB — fallback for dev environments without R2 configured
+ * Supports three modes (in order of preference):
+ *
+ *   1. S3-compatible (R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY)
+ *      — Full S3 API access for upload/download via AWS SDK
+ *   2. Cloudflare API + Public URL (R2_API_TOKEN + R2_PUBLIC_URL + R2_BUCKET)
+ *      — Uses Cloudflare API for uploads, public r2.dev URL for reads
+ *   3. Base64 in DB (no R2 config)
+ *      — Fallback for dev environments
  *
  * Configuration via environment variables:
- *   R2_ENDPOINT       — R2 endpoint URL (e.g. https://<account-id>.r2.cloudflarestorage.com)
- *   R2_ACCESS_KEY_ID  — R2 API token access key
- *   R2_SECRET_ACCESS_KEY — R2 API token secret key
- *   R2_BUCKET         — R2 bucket name (e.g. "operon-documents")
- *   R2_PUBLIC_URL     — Optional public base URL for direct access
+ *   R2_BUCKET            — R2 bucket name (e.g. "recruiter")
+ *   R2_PUBLIC_URL        — Public base URL for reads (e.g. "https://pub-xxx.r2.dev")
+ *   R2_API_TOKEN         — Cloudflare API token with R2 permissions (for API mode)
+ *   R2_ACCOUNT_ID        — Cloudflare account ID (for API mode)
+ *   R2_ACCESS_KEY_ID     — S3 access key (for S3 mode)
+ *   R2_SECRET_ACCESS_KEY — S3 secret key (for S3 mode)
  */
-
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // ── Configuration ───────────────────────────────────────────────────
 
-interface StorageConfig {
+interface S3Config {
+  mode: "s3";
   endpoint: string;
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
-  publicUrl?: string | undefined;
 }
+
+interface CfApiConfig {
+  mode: "cf-api";
+  apiToken: string;
+  accountId: string;
+  bucket: string;
+  publicUrl: string;
+}
+
+type StorageConfig = S3Config | CfApiConfig;
 
 function getConfig(): StorageConfig | null {
-  const endpoint = process.env["R2_ENDPOINT"];
+  const bucket = process.env["R2_BUCKET"];
+  if (!bucket) return null;
+
+  // S3 mode: has access key + secret
   const accessKeyId = process.env["R2_ACCESS_KEY_ID"];
   const secretAccessKey = process.env["R2_SECRET_ACCESS_KEY"];
-  const bucket = process.env["R2_BUCKET"];
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) return null;
-  return {
-    endpoint,
-    accessKeyId,
-    secretAccessKey,
-    bucket,
-    publicUrl: process.env["R2_PUBLIC_URL"] || undefined,
-  };
+  const endpoint = process.env["R2_ENDPOINT"];
+  if (accessKeyId && secretAccessKey && endpoint) {
+    return { mode: "s3", endpoint, accessKeyId, secretAccessKey, bucket };
+  }
+
+  // CF API mode: has API token + public URL
+  const apiToken = process.env["R2_API_TOKEN"];
+  const accountId = process.env["R2_ACCOUNT_ID"];
+  const publicUrl = process.env["R2_PUBLIC_URL"];
+  if (apiToken && accountId && publicUrl) {
+    return { mode: "cf-api", apiToken, accountId, bucket, publicUrl };
+  }
+
+  return null;
 }
 
-let _client: S3Client | null = null;
+// ── S3 Client (lazy) ───────────────────────────────────────────────
 
-function getClient(): S3Client | null {
-  const config = getConfig();
-  if (!config) return null;
-  if (_client) return _client;
-  _client = new S3Client({
+let _s3Client: any = null;
+
+function getS3Client(config: S3Config): any {
+  if (_s3Client) return _s3Client;
+  // Dynamic import to avoid loading S3 SDK when not needed
+  const { S3Client } = require("@aws-sdk/client-s3");
+  _s3Client = new S3Client({
     region: "auto",
     endpoint: config.endpoint,
     credentials: {
@@ -60,11 +78,11 @@ function getClient(): S3Client | null {
       secretAccessKey: config.secretAccessKey,
     },
   });
-  return _client;
+  return _s3Client;
 }
 
 export function isR2Configured(): boolean {
-  return getClient() !== null;
+  return getConfig() !== null;
 }
 
 // ── MIME type detection ─────────────────────────────────────────────
@@ -103,11 +121,11 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelayMs = 
   throw lastError!;
 }
 
-// ── Signed URL Cache ────────────────────────────────────────────────
-// In-memory TTL cache to avoid regenerating R2 signed URLs on every request.
-// URLs expire after 50 minutes (signed URLs last 60 minutes).
+// ── URL Cache ───────────────────────────────────────────────────────
+// Public URLs don't expire, but we cache to avoid repeated concatenation.
+// For S3 signed URLs, cache for 50 minutes (signed URLs last 60 minutes).
 
-const URL_CACHE_TTL_MS = 50 * 60 * 1000; // 50 minutes
+const URL_CACHE_TTL_MS = 50 * 60 * 1000;
 const urlCache = new Map<string, { url: string; expiresAt: number }>();
 
 function getCachedUrl(key: string): string | null {
@@ -120,9 +138,8 @@ function getCachedUrl(key: string): string | null {
   return entry.url;
 }
 
-function setCachedUrl(key: string, url: string): void {
-  urlCache.set(key, { url, expiresAt: Date.now() + URL_CACHE_TTL_MS });
-  // Evict stale entries when cache grows large
+function setCachedUrl(key: string, url: string, ttlMs = URL_CACHE_TTL_MS): void {
+  urlCache.set(key, { url, expiresAt: Date.now() + ttlMs });
   if (urlCache.size > 500) {
     const now = Date.now();
     for (const [k, v] of urlCache) {
@@ -134,15 +151,12 @@ function setCachedUrl(key: string, url: string): void {
 // ── Public API ──────────────────────────────────────────────────────
 
 export interface StorageUploadResult {
-  /** The storage key (path) for the file */
   key: string;
-  /** Whether the file was uploaded to R2 or stored as base64 */
   provider: "r2" | "base64";
 }
 
 /**
- * Upload a file to storage (R2 or base64 fallback).
- * Returns the storage key that can be used to retrieve the file later.
+ * Upload a file to storage.
  */
 export async function uploadDocument(params: {
   tenantId: string;
@@ -153,17 +167,23 @@ export async function uploadDocument(params: {
   const { tenantId, campaignId, fileName, buffer } = params;
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
   const key = `${tenantId}/${campaignId}/${crypto.randomUUID()}-${safeName}`;
+  const contentType = getMimeType(fileName);
 
-  const client = getClient();
-  if (client) {
-    // Upload to R2 with retry
+  const config = getConfig();
+  if (!config) {
+    return { key, provider: "base64" };
+  }
+
+  if (config.mode === "s3") {
+    const { PutObjectCommand } = require("@aws-sdk/client-s3");
+    const client = getS3Client(config);
     await withRetry(() =>
       client.send(
         new PutObjectCommand({
-          Bucket: getConfig()!.bucket,
+          Bucket: config.bucket,
           Key: key,
           Body: buffer,
-          ContentType: getMimeType(fileName),
+          ContentType: contentType,
           ContentLength: buffer.byteLength,
           Metadata: {
             "original-name": fileName,
@@ -176,65 +196,109 @@ export async function uploadDocument(params: {
     return { key, provider: "r2" };
   }
 
-  // Fallback: store base64 (caller handles DB storage)
+  // CF API mode: upload via Cloudflare API
+  if (config.mode === "cf-api") {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${encodeURIComponent(key)}`;
+    const response = await withRetry(async () => {
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${config.apiToken}`,
+          "Content-Type": contentType,
+        },
+        body: new Uint8Array(buffer),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`R2 upload failed (${res.status}): ${body}`);
+      }
+      return res;
+    });
+    return { key, provider: "r2" };
+  }
+
   return { key, provider: "base64" };
 }
 
 /**
- * Get a signed URL for reading a document from R2.
- * Falls back to null if R2 is not configured (caller should use base64 fallback).
+ * Get a URL for reading a document.
+ * - CF API mode: returns public URL (no expiry)
+ * - S3 mode: returns signed URL (1 hour)
+ * - No config: returns null (caller uses base64)
  */
 export async function getDocumentUrl(key: string): Promise<string | null> {
-  // Check cache first
   const cached = getCachedUrl(key);
   if (cached) return cached;
 
-  const client = getClient();
-  if (!client) return null;
+  const config = getConfig();
+  if (!config) return null;
 
-  try {
-    // Check if the object exists (with retry)
-    await withRetry(() =>
-      client.send(
-        new HeadObjectCommand({
-          Bucket: getConfig()!.bucket,
-          Key: key,
-        }),
-      ),
-    );
-
-    // Generate a signed URL (1 hour expiry)
-    const url = await getSignedUrl(
-      client,
-      new GetObjectCommand({
-        Bucket: getConfig()!.bucket,
-        Key: key,
-      }),
-      { expiresIn: 3600 },
-    );
-    setCachedUrl(key, url);
+  if (config.mode === "cf-api") {
+    // Public URL — no expiry, no signing needed
+    const url = `${config.publicUrl.replace(/\/$/, "")}/${key}`;
+    setCachedUrl(key, url, 24 * 60 * 60 * 1000); // Cache for 24h
     return url;
-  } catch {
-    return null;
   }
+
+  if (config.mode === "s3") {
+    try {
+      const { GetObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
+      const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+      const client = getS3Client(config);
+
+      await withRetry(() =>
+        client.send(
+          new HeadObjectCommand({ Bucket: config.bucket, Key: key }),
+        ),
+      );
+
+      const url = await getSignedUrl(
+        client,
+        new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+        { expiresIn: 3600 },
+      );
+      setCachedUrl(key, url);
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 /**
- * Check if a document exists in R2 storage.
+ * Check if a document exists in storage.
  */
 export async function documentExists(key: string): Promise<boolean> {
-  const client = getClient();
-  if (!client) return false;
+  const config = getConfig();
+  if (!config) return false;
 
-  try {
-    await client.send(
-      new HeadObjectCommand({
-        Bucket: getConfig()!.bucket,
-        Key: key,
-      }),
-    );
-    return true;
-  } catch {
-    return false;
+  if (config.mode === "cf-api") {
+    try {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${encodeURIComponent(key)}`;
+      const res = await fetch(url, {
+        method: "HEAD",
+        headers: { Authorization: `Bearer ${config.apiToken}` },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
+
+  if (config.mode === "s3") {
+    try {
+      const { HeadObjectCommand } = require("@aws-sdk/client-s3");
+      const client = getS3Client(config);
+      await client.send(
+        new HeadObjectCommand({ Bucket: config.bucket, Key: key }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }

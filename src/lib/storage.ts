@@ -85,6 +85,24 @@ export function getMimeType(fileName: string): string {
   return MIME_MAP[ext] ?? "application/octet-stream";
 }
 
+// ── Retry with exponential backoff ──────────────────────────────────
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelayMs = 500): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError!;
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
 export interface StorageUploadResult {
@@ -110,20 +128,22 @@ export async function uploadDocument(params: {
 
   const client = getClient();
   if (client) {
-    // Upload to R2
-    await client.send(
-      new PutObjectCommand({
-        Bucket: getConfig()!.bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: getMimeType(fileName),
-        ContentLength: buffer.byteLength,
-        Metadata: {
-          "original-name": fileName,
-          "tenant-id": tenantId,
-          "campaign-id": campaignId,
-        },
-      }),
+    // Upload to R2 with retry
+    await withRetry(() =>
+      client.send(
+        new PutObjectCommand({
+          Bucket: getConfig()!.bucket,
+          Key: key,
+          Body: buffer,
+          ContentType: getMimeType(fileName),
+          ContentLength: buffer.byteLength,
+          Metadata: {
+            "original-name": fileName,
+            "tenant-id": tenantId,
+            "campaign-id": campaignId,
+          },
+        }),
+      ),
     );
     return { key, provider: "r2" };
   }
@@ -141,12 +161,14 @@ export async function getDocumentUrl(key: string): Promise<string | null> {
   if (!client) return null;
 
   try {
-    // Check if the object exists
-    await client.send(
-      new HeadObjectCommand({
-        Bucket: getConfig()!.bucket,
-        Key: key,
-      }),
+    // Check if the object exists (with retry)
+    await withRetry(() =>
+      client.send(
+        new HeadObjectCommand({
+          Bucket: getConfig()!.bucket,
+          Key: key,
+        }),
+      ),
     );
 
     // Generate a signed URL (1 hour expiry)

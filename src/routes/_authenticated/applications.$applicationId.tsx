@@ -161,13 +161,29 @@ function ApplicationDetail() {
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["application", applicationId],
+    retry: 1,
+    staleTime: 30_000,
     queryFn: async () => {
-      const { data: application, error } = await supabase
+      let application: any = null;
+      // First try the full join query
+      const fullRes = await supabase
         .from("applications")
         .select("*, candidates(*), campaigns(id, name, job_title, builder)")
         .eq("id", applicationId)
         .maybeSingle();
-      if (error) throw error;
+      if (fullRes.error) {
+        // Fallback: fetch without joins if the join fails (RLS, schema mismatch)
+        console.warn("[ApplicationDetail] Full join query failed, trying fallback:", fullRes.error.message);
+        const fallback = await supabase
+          .from("applications")
+          .select("*")
+          .eq("id", applicationId)
+          .maybeSingle();
+        if (fallback.error) throw fallback.error;
+        application = fallback.data;
+      } else {
+        application = fullRes.data;
+      }
       if (!application) return null;
 
       // Communications are keyed by the candidate's email or WhatsApp phone
@@ -224,11 +240,13 @@ function ApplicationDetail() {
           .select("id, name, position")
           .eq("campaign_id", application.campaign_id)
           .order("position"),
-        supabase
-          .from("communications")
-          .select("*")
-          .in("recipient", communicationRecipients.filter(Boolean))
-          .order("created_at", { ascending: false }),
+        communicationRecipients.filter(Boolean).length > 0
+          ? supabase
+              .from("communications")
+              .select("*")
+              .in("recipient", communicationRecipients.filter(Boolean))
+              .order("created_at", { ascending: false })
+          : { data: [], error: null } as any,
       ]);
 
       // AI extraction results (best-effort — table may not exist yet)

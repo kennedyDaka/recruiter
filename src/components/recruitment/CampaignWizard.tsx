@@ -444,9 +444,39 @@ function Picker({
   );
 }
 
+/** Return human-readable reasons why the Next button should be disabled on a given step. */
+function getStepErrors(step: number, builder: JobBuilder): string[] {
+  const errors: string[] = [];
+  switch (step) {
+    case 0: // Role
+      if (!builder.jobTitle.trim())
+        errors.push("Enter or search for a job title");
+      if (!builder.hiringReason)
+        errors.push("Select a reason for hiring");
+      if (!builder.employmentType)
+        errors.push("Select an employment type");
+      break;
+    case 1: // Location
+      if (!builder.country)
+        errors.push("Select a country");
+      if (!builder.region)
+        errors.push("Select a region");
+      if (!builder.city)
+        errors.push("Select a city or district");
+      break;
+    case 2: // Requirements
+      if (builder.minExperience < 0)
+        errors.push("Minimum experience cannot be negative");
+      break;
+    // Steps 3–7 have no hard blocking requirements
+  }
+  return errors;
+}
+
 export function CampaignWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [visitedSteps, setVisitedSteps] = useState<Set<number>>(new Set([0]));
   const [builder, setBuilder] = useState<JobBuilder>(() => defaultBuilder());
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [testScoringOpen, setTestScoringOpen] = useState(false);
@@ -768,21 +798,34 @@ export function CampaignWizard() {
   return (
     <div className="space-y-6">
       <ol className="flex flex-wrap gap-2">
-        {STEPS.map((label, index) => (
-          <li key={label}>
-            <button
-              type="button"
-              onClick={() => setStep(index)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                index === step
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {index + 1}. {label}
-            </button>
-          </li>
-        ))}
+        {STEPS.map((label, index) => {
+          const hasErrors = visitedSteps.has(index) && getStepErrors(index, builder).length > 0;
+          return (
+            <li key={label}>
+              <button
+                type="button"
+                onClick={() => {
+                  setVisitedSteps((prev) => new Set([...prev, index]));
+                  setStep(index);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  index === step
+                    ? "bg-primary text-primary-foreground"
+                    : hasErrors
+                      ? "bg-destructive/15 text-destructive ring-1 ring-destructive/30"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {index + 1}. {label}
+                {hasErrors ? (
+                  <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                    {getStepErrors(index, builder).length}
+                  </span>
+                ) : null}
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -2177,6 +2220,7 @@ export function CampaignWizard() {
                 variant="outline"
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending || !builder.jobTitle}
+                title={!builder.jobTitle ? "Enter a job title before saving" : undefined}
               >
                 {saveMutation.isPending ? "Saving…" : "Save draft"}
               </Button>
@@ -2184,10 +2228,25 @@ export function CampaignWizard() {
                 type="button"
                 onClick={() => publishMutation.mutate()}
                 disabled={publishMutation.isPending || issues.length > 0}
+                title={
+                  issues.length > 0
+                    ? `${issues.length} issue${issues.length > 1 ? "s" : ""} must be fixed first`
+                    : undefined
+                }
               >
                 {publishMutation.isPending ? "Publishing…" : "Pay & publish"}
               </Button>
             </div>
+            {!builder.jobTitle ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Enter a job title on Step 1 to save a draft.
+              </p>
+            ) : null}
+            {issues.length > 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Fix the {issues.length} quality issue{issues.length > 1 ? "s" : ""} listed above before publishing.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -2203,16 +2262,28 @@ export function CampaignWizard() {
         </Button>
         <Button
           type="button"
-          disabled={step === STEPS.length - 1}
+          disabled={step === STEPS.length - 1 || getStepErrors(step, builder).length > 0}
+          title={
+            getStepErrors(step, builder).length > 0
+              ? getStepErrors(step, builder).join(" · ")
+              : undefined
+          }
           onClick={() => {
             if (step === 4 && builder.questions.length === 0)
               patch({ questions: generateQuestions(builder) });
-            setStep((s) => Math.min(STEPS.length - 1, s + 1));
+            const next = Math.min(STEPS.length - 1, step + 1);
+            setVisitedSteps((prev) => new Set([...prev, next]));
+            setStep(next);
           }}
         >
           Next
         </Button>
       </div>
+      {getStepErrors(step, builder).length > 0 ? (
+        <p className="mt-1 text-right text-xs text-muted-foreground">
+          {getStepErrors(step, builder).join(" · ")}
+        </p>
+      ) : null}
 
       {/* Test Scoring Dialog */}
       <TestScoringDialog

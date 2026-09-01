@@ -907,7 +907,7 @@ function ApplyPage() {
         form.first_name.trim().length > 0 &&
         form.last_name.trim().length > 0 &&
         form.email.trim().length > 0 &&
-        /^S+@S+.S+$/.test(form.email.trim()) &&
+        /^\S+@\S+\.\S+$/.test(form.email.trim()) &&
         form.country.length > 0 &&
         form.city.trim().length > 0 &&
         form.professional_summary.trim().length >= 40 &&
@@ -1071,6 +1071,40 @@ function ApplyPage() {
       return stored.map((option) => ({ label: option.label, value: option.value }));
     return (question.options ?? []).map((option) => ({ label: option, value: option }));
   };
+
+  // Human-readable reasons why Continue is disabled
+  const stepErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (currentStep === "contact") {
+      if (!form.first_name.trim()) errors.push("First name");
+      if (!form.last_name.trim()) errors.push("Last name");
+      if (!form.email.trim() || !/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.push("Valid email");
+      if (!form.country) errors.push("Country");
+      if (!form.city.trim()) errors.push("City");
+      if (form.professional_summary.trim().length < 40)
+        errors.push(`Professional summary (${form.professional_summary.trim().length}/40 chars)`);
+      if (skills.length === 0) errors.push("At least one skill");
+    } else if (currentStep === "education") {
+      const requiredCerts = campaign?.required_certifications ?? [];
+      const missingCerts = requiredCerts.filter(
+        (cert) => !certifications.some((held) => held.toLowerCase() === cert.toLowerCase()),
+      );
+      education.forEach((entry, i) => {
+        if (!entry.institution.trim()) errors.push(`Institution for education ${i + 1}`);
+        if (!entry.field_of_study.trim()) errors.push(`Field of study for education ${i + 1}`);
+      });
+      if (missingCerts.length > 0)
+        errors.push(`Missing required certification${missingCerts.length > 1 ? "s" : ""}: ${missingCerts.join(", ")}`);
+    } else if (currentStep === "experience") {
+      const required = campaign?.referee_count ?? 2;
+      const valid = referees.filter(
+        (ref) => ref.name.trim() && (ref.email.trim() || ref.phone.trim()),
+      ).length;
+      if (valid < required)
+        errors.push(`${required - valid} more referee${required - valid > 1 ? "s" : ""} with name and contact`);
+    }
+    return errors;
+  }, [currentStep, form, education, skills, certifications, referees, campaign?.referee_count, campaign?.required_certifications]);
 
   const continueApplication = () => {
     if (!canContinue) return;
@@ -2162,6 +2196,13 @@ function ApplyPage() {
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
+                {!canContinue && stepErrors.length > 0 ? (
+                  <p className="text-xs text-destructive sm:text-right">
+                    {stepErrors.length <= 3
+                      ? `Complete: ${stepErrors.join(", ")}`
+                      : `${stepErrors.length} fields incomplete — scroll up to fill them in`}
+                  </p>
+                ) : null}
               </div>
             </form>
             <AlertDialog open={submitConfirmationOpen} onOpenChange={setSubmitConfirmationOpen}>

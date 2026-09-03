@@ -22,18 +22,8 @@ export const getCurrentSessionFn = createServerFn({ method: "GET" }).handler(
         // Tenant resolution can fail — admin users may not have a tenant.
       }
 
-      // Check for super_admin role (no tenant needed)
-      let role = "company_admin";
-      try {
-        const { dbQueryFirst } = await import("@/lib/db");
-        const roleRow = await dbQueryFirst(
-          "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
-          [session.userId],
-        );
-        role = (roleRow?.role as string) ?? "company_admin";
-      } catch {
-        // Role query failed — default to company_admin (non-admin).
-      }
+      // Role comes from the JWT payload (embedded at sign-in time).
+      const role = (session.role as string) ?? "company_admin";
 
       return {
         userId: session.userId,
@@ -62,15 +52,23 @@ export const establishSessionFn = createServerFn({ method: "POST" })
     const { setSessionCookieServer } = await import("@/lib/auth/session.server");
     const payload = await verifySession(data.token);
     if (payload) await setSessionCookieServer(data.token);
-    // Look up role so session callback can redirect super_admin to /admin
+    // Look up role so session callback can redirect super_admin to /admin.
+    // Prefer the role from the JWT payload; fall back to DB query.
     let role: string | null = null;
-    if (payload?.userId) {
-      const { dbQueryFirst } = await import("@/lib/db");
-      const roleRow = await dbQueryFirst(
-        "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
-        [payload.userId],
-      );
-      role = (roleRow?.role as string) ?? null;
+    if (payload?.role) {
+      role = payload.role as string;
+    }
+    if (!role) {
+      try {
+        const { dbQueryFirst } = await import("@/lib/db");
+        const roleRow = await dbQueryFirst(
+          "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
+          [payload.userId],
+        );
+        role = (roleRow?.role as string) ?? null;
+      } catch {
+        // DB query failed — role stays null.
+      }
     }
     return { verified: Boolean(payload), tenantId: payload?.tenantId ?? null, role };
   });

@@ -529,6 +529,7 @@ export const signInFn = createServerFn({ method: "POST" })
     const token = await createSession({
       userId: profile.id,
       email: profile.email,
+      role,
       sessionVersion: Number(profile.session_version ?? 0),
       ...(profile.tenant_id ? { tenantId: profile.tenant_id } : {}),
     });

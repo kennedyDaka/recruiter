@@ -1,17 +1,16 @@
 import { json } from "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-
-const DAILY_RATE = 15_000;
-const MIN_DAYS = 3;
+import { DAILY_RATE, MIN_DAYS, MAX_DAYS, calculateCampaignPrice } from "@/lib/payment/pricing";
 
 const initiatePaymentSchema = z.object({
   campaignId: z.string().min(1),
-  numDays: z.number().int().min(MIN_DAYS).max(365),
+  numDays: z.number().int().min(MIN_DAYS).max(MAX_DAYS),
+  phone: z.string().optional(),
+  provider: z.enum(["airtel_money", "tnm_mpamba", "card"]),
   customer: z.object({
     name: z.string().min(1),
     email: z.string().email(),
-    phone: z.string().optional(),
   }),
 });
 
@@ -35,10 +34,17 @@ export const Route = createFileRoute("/api/payment/initiate")({
           const body = await request.json();
           const data = initiatePaymentSchema.parse(body);
 
+          // Phone required for mobile money, not for card
+          if (data.provider !== "card" && (!data.phone || data.phone.length < 10)) {
+            return json({ error: "Phone number is required for mobile money payments." }, { status: 400 });
+          }
+
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-          // Campaign must exist and belong to this tenant — parallel with plan lookup
-          const amount = data.numDays * DAILY_RATE;
+          // Server-side price calculation — never trust frontend amount
+          const amount = calculateCampaignPrice(data.numDays);
+
+          // Campaign must exist and belong to this tenant
           const [campaignRes, defaultPlanRes] = await Promise.all([
             supabaseAdmin
               .from("campaigns")
@@ -53,15 +59,33 @@ export const Route = createFileRoute("/api/payment/initiate")({
               .limit(1)
               .maybeSingle(),
           ]);
+
           if (campaignRes.error || !campaignRes.data) {
             return json({ error: "Campaign not found." }, { status: 404 });
           }
           if (campaignRes.data.tenant_id !== tenantId) {
             return json({ error: "Campaign not found." }, { status: 404 });
           }
+
           const fallbackPlanId = defaultPlanRes.data?.id;
           if (!fallbackPlanId) {
             return json({ error: "No active plan configured" }, { status: 500 });
+          }
+
+          // Simpler check: find any paid invoice for this campaign
+          const paidInvoiceRes = await supabaseAdmin
+            .from("invoices")
+            .select("id")
+            .eq("campaign_id", data.campaignId)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle();
+
+          if (paidInvoiceRes.data) {
+            return json(
+              { error: "Campaign already activated. No further payment needed." },
+              { status: 409 },
+            );
           }
 
           // Create invoice
@@ -87,10 +111,11 @@ export const Route = createFileRoute("/api/payment/initiate")({
 
           const invoice = invoiceRes.data;
 
-          // Generate transaction reference
+          // Generate unique charge ID for this transaction
+          const chargeId = `CHG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
           const txRef = `TX-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-          // Create payment record (no payment_method — user selects on PayChangu)
+          // Create payment record
           const paymentRes = await supabaseAdmin
             .from("payments")
             .insert({
@@ -98,16 +123,19 @@ export const Route = createFileRoute("/api/payment/initiate")({
               invoice_id: invoice.id,
               provider: "paychangu",
               tx_ref: txRef,
+              charge_id: chargeId,
               amount: invoice.amount,
               currency: invoice.currency,
+              payment_method: data.provider,
+              phone_number: data.phone ?? null,
               status: "pending",
               metadata: JSON.stringify({
                 customer_email: data.customer.email,
                 customer_name: data.customer.name,
-                customer_phone: data.customer.phone,
+                num_days: data.numDays,
               }),
             })
-            .select("id, tx_ref")
+            .select("id, tx_ref, charge_id")
             .single();
 
           if (paymentRes.error) {
@@ -120,68 +148,93 @@ export const Route = createFileRoute("/api/payment/initiate")({
             .update({ status: "processing" })
             .eq("id", invoice.id);
 
-          // Call PayChangu API to create checkout session
           const nameParts = data.customer.name.trim().split(/\s+/);
           const firstName = nameParts[0] ?? data.customer.name;
           const lastName = nameParts.slice(1).join(" ") || firstName;
 
-          const paychanguResponse = await fetch(
-            `${process.env["PAYCHANGU_API_URL"] ?? "https://api.paychangu.com"}/payment`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${process.env["PAYCHANGU_SECRET_KEY"]}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                amount: String(invoice.amount),
-                currency: invoice.currency,
-                tx_ref: txRef,
-                first_name: firstName,
-                last_name: lastName,
-                email: data.customer.email,
-                callback_url: `${process.env["APP_URL"]}/api/payment/webhook`,
-                return_url: `${process.env["APP_URL"]}/payment/success?tx_ref=${txRef}&campaign_id=${data.campaignId}`,
-                customization: {
-                  title: "Operon Recruit",
-                  description: `${data.numDays}-day campaign activation`,
-                },
-                meta: {
-                  invoice_id: invoice.id,
-                  campaign_id: data.campaignId,
-                  campaign_name: campaignRes.data.name,
-                  num_days: data.numDays,
-                },
-              }),
-            },
-          );
+          // ── Card payment: create checkout session ──
+          if (data.provider === "card") {
+            const { createCheckoutSession } = await import(
+              "@/lib/payment/providers/paychangu-checkout"
+            );
 
-          const paychanguData = await paychanguResponse.json();
+            const callbackUrl = `${process.env.APP_URL ?? "https://recruitermw.com"}/api/payment/webhook`;
 
-          if (!paychanguResponse.ok || !paychanguData.data?.checkout_url) {
+            const checkoutResult = await createCheckoutSession({
+              amount: invoice.amount,
+              currency: "MWK",
+              txRef,
+              email: data.customer.email,
+              firstName,
+              lastName,
+              callbackUrl,
+            });
+
+            if (!checkoutResult.success) {
+              await supabaseAdmin
+                .from("payments")
+                .update({ status: "failed", error_message: checkoutResult.error, failed_at: new Date().toISOString() })
+                .eq("id", paymentRes.data.id);
+              await supabaseAdmin
+                .from("invoices")
+                .update({ status: "failed" })
+                .eq("id", invoice.id);
+              return json({ error: checkoutResult.error ?? "Failed to create checkout session" }, { status: 500 });
+            }
+
             await supabaseAdmin
               .from("payments")
-              .update({
-                status: "failed",
-                error_message: paychanguData.message ?? "Failed to create checkout",
-                failed_at: new Date().toISOString(),
-              })
+              .update({ status: "processing", initiated_at: new Date().toISOString() })
               .eq("id", paymentRes.data.id);
 
+            return json({
+              success: true,
+              paymentId: paymentRes.data.id,
+              chargeId,
+              txRef,
+              checkoutUrl: checkoutResult.checkoutUrl,
+              status: "processing",
+            });
+          }
+
+          // ── Mobile Money: direct charge ──
+          const { initiateMobileMoneyCharge } = await import(
+            "@/lib/payment/providers/paychangu-mobile-money"
+          );
+
+          const chargeResult = await initiateMobileMoneyCharge({
+            phone: data.phone!,
+            amount: invoice.amount,
+            chargeId,
+            provider: data.provider as "airtel_money" | "tnm_mpamba",
+            firstName,
+            lastName,
+            email: data.customer.email,
+          });
+
+          if (!chargeResult.success) {
+            await supabaseAdmin
+              .from("payments")
+              .update({ status: "failed", error_message: chargeResult.error, failed_at: new Date().toISOString() })
+              .eq("id", paymentRes.data.id);
             await supabaseAdmin
               .from("invoices")
               .update({ status: "failed" })
               .eq("id", invoice.id);
-
-            return json({ error: "Failed to initiate payment" }, { status: 500 });
+            return json({ error: chargeResult.error ?? "Failed to initiate payment" }, { status: 500 });
           }
+
+          await supabaseAdmin
+            .from("payments")
+            .update({ status: "processing", provider_transaction_id: chargeResult.refId, initiated_at: new Date().toISOString() })
+            .eq("id", paymentRes.data.id);
 
           return json({
             success: true,
             paymentId: paymentRes.data.id,
+            chargeId,
             txRef,
-            checkoutUrl: paychanguData.data.checkout_url,
+            status: "processing",
           });
         } catch (error: any) {
           console.error("Payment initiation error:", error);

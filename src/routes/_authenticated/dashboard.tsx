@@ -11,12 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Recruitment dashboard — Operon Recruit" },
+      { title: "Recruitment dashboard — RecruiterMW" },
       {
         name: "description",
         content: "Track campaigns, applications and shortlists in one place.",
       },
-      { property: "og:title", content: "Recruitment dashboard — Operon Recruit" },
+      { property: "og:title", content: "Recruitment dashboard — RecruiterMW" },
       { property: "og:description", content: "Track campaigns, applications and shortlists." },
     ],
   }),
@@ -45,7 +45,7 @@ function Dashboard() {
     { label: "Active campaigns", value: active, icon: Briefcase },
     { label: "Applications", value: applications.length, icon: FileCheck2 },
     { label: "Strong matches", value: shortlisted, icon: Star },
-    { label: "Average ORS score", value: avg, icon: Users },
+    { label: "Average score", value: avg, icon: Users },
   ];
 
   return (

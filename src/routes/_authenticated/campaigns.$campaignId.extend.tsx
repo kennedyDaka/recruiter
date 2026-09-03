@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,15 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, Calendar, AlertCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, Calendar, AlertCircle, Clock, ArrowLeft, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
-const DAILY_RATE = 15_000;
-const MIN_DAYS = 3;
-const PRESET_DAYS = [3, 7, 14, 30, 60];
+import { DAILY_RATE, MIN_DAYS, PRESET_DAYS, calculateCampaignPrice, formatMWK } from "@/lib/payment/pricing";
 
 export const Route = createFileRoute("/_authenticated/campaigns/$campaignId/extend")({
+  head: () => ({ meta: [{ title: "Extend Campaign — RecruiterMW" }] }),
   component: ExtendCampaign,
 });
 
@@ -71,6 +69,8 @@ function ExtendCampaign() {
 
   const totalAmount = extraDays * DAILY_RATE;
 
+  const [state, setState] = useState<"idle" | "polling" | "success" | "failed">("idle");
+
   const extendMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/payment/initiate", {
@@ -79,36 +79,27 @@ function ExtendCampaign() {
         body: JSON.stringify({
           campaignId,
           numDays: extraDays,
-          customer: { name: companyName, email: companyEmail, phone: profile?.phone ?? "" },
+          provider: "card",
+          customer: { name: companyName, email: companyEmail },
         }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: "Payment initiation failed" }));
         throw new Error(err.error || "Payment initiation failed");
       }
-      return response.json();
+      return response.json() as Promise<{ paymentId: string; chargeId: string; status: string; checkoutUrl?: string }>;
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
-        const a = document.createElement("a");
-        a.href = data.checkoutUrl;
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        toast.success("Redirecting to payment…");
-      } else {
-        toast.error("Failed to get checkout URL");
+        window.location.href = data.checkoutUrl;
+        return;
       }
+      toast.error("Failed to start payment. Please try again.");
     },
     onError: (error) => {
       toast.error(error.message);
     },
   });
-
-  const fmt = (amount: number) =>
-    new Intl.NumberFormat("en-MW", { style: "currency", currency: "MWK" }).format(amount);
 
   if (campaignLoading) {
     return (
@@ -123,9 +114,7 @@ function ExtendCampaign() {
       <div className="container mx-auto py-8 max-w-2xl text-center">
         <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
         <h1 className="text-2xl font-bold">Cannot extend this campaign</h1>
-        <p className="text-muted-foreground mt-2">
-          Only active campaigns can be extended.
-        </p>
+        <p className="text-muted-foreground mt-2">Only active campaigns can be extended.</p>
         <Button className="mt-4" onClick={() => navigate({ to: "/campaigns" })}>
           Back to campaigns
         </Button>
@@ -136,6 +125,12 @@ function ExtendCampaign() {
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
+        <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
+          <Link to="/campaigns/$campaignId" params={{ campaignId }}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back to campaign
+          </Link>
+        </Button>
         <h1 className="text-3xl font-bold">Extend Campaign</h1>
         <p className="text-muted-foreground mt-2">
           Add more days to keep your campaign live and accepting applications
@@ -143,10 +138,21 @@ function ExtendCampaign() {
         <p className="text-sm font-medium mt-1">{campaign.name}</p>
       </div>
 
+      {state === "success" && (
+        <Card className="mb-8 border-green-200 bg-green-50">
+          <CardContent className="py-6 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-green-900">Payment successful!</h3>
+            <p className="text-sm text-green-700 mt-1">
+              Your campaign has been extended by {extraDays} days.
+            </p>
+            <p className="text-sm text-green-700">Redirecting to campaigns...</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Extension Duration + Pricing */}
         <div className="space-y-6">
-          {/* Current status */}
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
@@ -155,9 +161,7 @@ function ExtendCampaign() {
                   <p className="font-medium text-amber-800">Current campaign</p>
                   <p className="text-amber-700">
                     {daysRemaining} days remaining
-                    {currentClosing && (
-                      <> — closes {currentClosing.toLocaleDateString("en-GB")}</>
-                    )}
+                    {currentClosing && <> — closes {currentClosing.toLocaleDateString("en-GB")}</>}
                   </p>
                 </div>
               </div>
@@ -205,7 +209,7 @@ function ExtendCampaign() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Daily rate</span>
-                  <span>{fmt(DAILY_RATE)} / day</span>
+                  <span>{formatMWK(DAILY_RATE)} / day</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Extension</span>
@@ -214,26 +218,26 @@ function ExtendCampaign() {
                 {newClosing && (
                   <div className="flex justify-between">
                     <span>New closing date</span>
-                    <span className="font-medium">
-                      {newClosing.toLocaleDateString("en-GB")}
-                    </span>
+                    <span className="font-medium">{newClosing.toLocaleDateString("en-GB")}</span>
                   </div>
                 )}
                 <div className="border-t border-primary/20 pt-2 flex justify-between text-base font-bold">
                   <span>Total</span>
-                  <span className="text-primary">{fmt(totalAmount)}</span>
+                  <span className="text-primary">{formatMWK(totalAmount)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Confirm + Pay */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Confirm & Pay</h2>
+          <h2 className="text-xl font-semibold mb-4">Payment</h2>
           <Card>
             <CardHeader>
-              <CardTitle>Extension Summary</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Secure Checkout
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-3 text-sm">
@@ -261,34 +265,44 @@ function ExtendCampaign() {
                 )}
                 <div className="border-t border-border pt-2 flex justify-between text-base font-bold">
                   <span>Total</span>
-                  <span className="text-primary">{fmt(totalAmount)}</span>
+                  <span className="text-primary">{formatMWK(totalAmount)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="flex items-start gap-2">
+                  <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                  <div className="space-y-1 text-xs text-blue-800">
+                    <p className="font-medium">PayChangu Secure Checkout</p>
+                    <p>You will be redirected to PayChangu's secure payment page where you can pay with Mobile Money, Visa, or Mastercard.</p>
+                  </div>
                 </div>
               </div>
 
               <Button
                 className="w-full"
                 size="lg"
-                disabled={!companyEmail || extendMutation.isPending}
+                disabled={extendMutation.isPending}
                 onClick={() => extendMutation.mutate()}
               >
                 {extendMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirecting to payment…
+                    Redirecting to checkout...
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Pay {fmt(totalAmount)}
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Pay {formatMWK(totalAmount)}
                   </>
                 )}
               </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Secure payment — powered by PayChangu
+              </p>
             </CardContent>
           </Card>
-
-          <p className="mt-4 text-sm text-muted-foreground text-center">
-            Secure payment — powered by PayChangu
-          </p>
         </div>
       </div>
     </div>

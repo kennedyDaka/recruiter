@@ -1,6 +1,6 @@
 /**
  * Admin Dashboard — super-admin monitoring panel.
- * Shows tenants, campaigns, applications, revenue, and site traffic.
+ * Shows tenants, campaigns, applications, revenue, and payment monitoring.
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -23,11 +23,16 @@ import {
   BarChart3,
   TrendingUp,
   Shield,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  CreditCard,
+  Ticket,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
-    meta: [{ title: "Admin Dashboard — Operon Recruit" }],
+    meta: [{ title: "Admin Dashboard — RecruiterMW" }],
   }),
   component: AdminDashboard,
 });
@@ -153,7 +158,7 @@ function AdminDashboard() {
               {stats?.avgScore ?? 0}
             </p>
             <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-              Avg ORS Score
+              Avg Score
             </p>
           </CardContent>
         </Card>
@@ -189,6 +194,87 @@ function AdminDashboard() {
         <Button asChild variant="outline" size="sm">
           <Link to="/campaigns"><Briefcase className="mr-2 size-4" />All Campaigns</Link>
         </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/admin/transactions"><CreditCard className="mr-2 size-4" />All Transactions</Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/admin/promo-codes"><Ticket className="mr-2 size-4" />Promo Codes</Link>
+        </Button>
+      </div>
+
+      {/* Payment Monitoring */}
+      <div className="mt-6">
+        <h2 className="font-display text-lg font-semibold">Payment Monitoring</h2>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="size-5 text-green-600" />
+                <div>
+                  <p className="font-display text-2xl font-semibold">
+                    {stats?.successfulPayments ?? 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Successful</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <XCircle className="size-5 text-red-500" />
+                <div>
+                  <p className="font-display text-2xl font-semibold">
+                    {stats?.failedPayments ?? 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Failed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Clock className="size-5 text-amber-500" />
+                <div>
+                  <p className="font-display text-2xl font-semibold">
+                    {stats?.pendingPayments ?? 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="size-5 text-green-600" />
+                <div>
+                  <p className="font-display text-2xl font-semibold">
+                    MWK {(stats?.totalRevenue ?? 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Total Revenue</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Payment Method Breakdown */}
+        {stats?.paymentByMethod && Object.keys(stats.paymentByMethod).length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {Object.entries(stats.paymentByMethod).map(([method, count]) => (
+              <Badge key={method} variant="secondary" className="text-xs">
+                {method === "airtel_money"
+                  ? "Airtel Money"
+                  : method === "tnm_mpamba"
+                    ? "TNM Mpamba"
+                    : method}
+                : {count}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -217,9 +303,30 @@ function AdminDashboard() {
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-border/70 px-4 py-3 text-sm">
                   <div>
                     <p className="font-medium">{p.currency} {p.amount?.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">{p.status}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.payment_method === "airtel_money"
+                        ? "Airtel Money"
+                        : p.payment_method === "tnm_mpamba"
+                          ? "TNM Mpamba"
+                          : p.payment_method ?? "Unknown"}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>
+                  <div className="text-right">
+                    <Badge
+                      variant={
+                        p.status === "success"
+                          ? "default"
+                          : p.status === "failed"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {p.status}
+                    </Badge>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {new Date(p.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </p>
+                  </div>
                 </div>
               ))}
               {(!stats?.recentPayments || stats.recentPayments.length === 0) && <p className="text-sm text-muted-foreground">No payments yet.</p>}

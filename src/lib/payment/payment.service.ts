@@ -261,7 +261,7 @@ export const initiatePayChanguPayment = createServerFn({ method: "POST" })
           callback_url: `${process.env["APP_URL"]}/api/payment/webhook`,
           return_url: `${process.env["APP_URL"]}/payment/success?tx_ref=${txRef}`,
           customization: {
-            title: "Operon Recruit — " + planName,
+            title: "RecruiterMW — " + planName,
             description: "Payment for " + planName,
           },
           meta: {
@@ -322,12 +322,18 @@ export const processPayChanguWebhook = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Determine event type — handle both checkout and direct charge formats
+    const eventType =
+      (data.payload["event_type"] as string) ??
+      (data.payload["event"] as string) ??
+      "unknown";
+
     // Log webhook for audit trail
     const webhookLogRes = await supabaseAdmin
       .from("webhook_logs")
       .insert({
         provider: "paychangu",
-        event_type: (data.payload["event"] as string) ?? "unknown",
+        event_type: eventType,
         payload: JSON.stringify(data.payload),
         signature: data.signature ?? null,
       })
@@ -338,11 +344,12 @@ export const processPayChanguWebhook = createServerFn({ method: "POST" })
       console.error("Failed to log webhook:", webhookLogRes.error);
     }
 
-    const event = data.payload["event"] as string;
-    const webhookData = data.payload["data"] as Record<string, unknown>;
-
     // Only process successful payments
-    if (event !== "charge.success") {
+    // checkout: "charge.success"  |  direct charge: "api.charge.payment"
+    const isSuccess =
+      eventType === "charge.success" || eventType === "api.charge.payment";
+
+    if (!isSuccess) {
       // Mark webhook as processed but not actionable
       if (webhookLogRes.data) {
         await supabaseAdmin
@@ -353,21 +360,33 @@ export const processPayChanguWebhook = createServerFn({ method: "POST" })
       return { processed: true, action: "ignored" };
     }
 
+    // Extract identifiers — direct charges use a flat structure, checkout wraps in "data"
+    const webhookData = (data.payload["data"] as Record<string, unknown>) ?? data.payload;
     const txRef = webhookData["tx_ref"] as string;
     const chargeId = webhookData["charge_id"] as string;
 
-    if (!txRef) {
-      return { processed: false, error: "Missing tx_ref in webhook" };
+    // For direct charges, charge_id is the primary identifier; tx_ref may be absent
+    if (!txRef && !chargeId) {
+      return { processed: false, error: "Missing tx_ref and charge_id in webhook" };
     }
 
-    // Find the payment record
-    const paymentRes = await supabaseAdmin
-      .from("payments")
-      .select("id, invoice_id, status, amount, currency")
-      .eq("tx_ref", txRef)
-      .maybeSingle();
-
-    if (paymentRes.error || !paymentRes.data) {
+    // Find the payment record — try tx_ref first, then charge_id
+    let paymentRes;
+    if (txRef) {
+      paymentRes = await supabaseAdmin
+        .from("payments")
+        .select("id, invoice_id, status, amount, currency, charge_id")
+        .eq("tx_ref", txRef)
+        .maybeSingle();
+    }
+    if (!paymentRes?.data && chargeId) {
+      paymentRes = await supabaseAdmin
+        .from("payments")
+        .select("id, invoice_id, status, amount, currency, charge_id")
+        .eq("charge_id", chargeId)
+        .maybeSingle();
+    }
+    if (!paymentRes || paymentRes.error || !paymentRes.data) {
       return { processed: false, error: "Payment not found" };
     }
 
@@ -381,38 +400,74 @@ export const processPayChanguWebhook = createServerFn({ method: "POST" })
     // SERVER-SIDE VERIFICATION with PayChangu
     // This is critical — never trust the browser/webhook alone
     try {
-      // PayChangu verification: GET https://api.paychangu.com/verify-payment/{tx_ref}
-      const verifyResponse = await fetch(`${PAYCHANGU_CONFIG.baseUrl}/verify-payment/${txRef}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${PAYCHANGU_CONFIG.secretKey}`,
-          Accept: "application/json",
-        },
-      });
+      let verifyData: Record<string, unknown>;
 
-      const verifyData = await verifyResponse.json();
+      if (payment.charge_id) {
+        // Direct charge — verify via charge endpoint
+        const verifyResponse = await fetch(
+          `${PAYCHANGU_CONFIG.baseUrl}/mobile-money/payments/${payment.charge_id}/verify`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${PAYCHANGU_CONFIG.secretKey}`,
+              Accept: "application/json",
+            },
+          },
+        );
+        verifyData = await verifyResponse.json();
 
-      if (!verifyResponse.ok || verifyData.data?.status !== "success") {
-        // Verification failed
-        await supabaseAdmin
-          .from("payments")
-          .update({
-            status: "failed",
-            error_message: `Verification failed: ${verifyData.message ?? "Unknown error"}`,
-            verified_at: new Date().toISOString(),
-          })
-          .eq("id", payment.id);
+        if (!verifyResponse.ok || (verifyData.data as Record<string, unknown>)?.status !== "success") {
+          await supabaseAdmin
+            .from("payments")
+            .update({
+              status: "failed",
+              error_message: `Verification failed: ${(verifyData as Record<string, unknown>).message ?? "Unknown error"}`,
+              verified_at: new Date().toISOString(),
+            })
+            .eq("id", payment.id);
 
-        await supabaseAdmin
-          .from("invoices")
-          .update({ status: "failed" })
-          .eq("id", payment.invoice_id);
+          await supabaseAdmin
+            .from("invoices")
+            .update({ status: "failed" })
+            .eq("id", payment.invoice_id);
 
-        return { processed: false, error: "Verification failed" };
+          return { processed: false, error: "Verification failed" };
+        }
+      } else {
+        // Checkout — verify via tx_ref endpoint
+        const verifyResponse = await fetch(
+          `${PAYCHANGU_CONFIG.baseUrl}/verify-payment/${txRef}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${PAYCHANGU_CONFIG.secretKey}`,
+              Accept: "application/json",
+            },
+          },
+        );
+        verifyData = await verifyResponse.json();
+
+        if (!verifyResponse.ok || (verifyData.data as Record<string, unknown>)?.status !== "success") {
+          await supabaseAdmin
+            .from("payments")
+            .update({
+              status: "failed",
+              error_message: `Verification failed: ${(verifyData.data as Record<string, unknown>)?.message ?? "Unknown error"}`,
+              verified_at: new Date().toISOString(),
+            })
+            .eq("id", payment.id);
+
+          await supabaseAdmin
+            .from("invoices")
+            .update({ status: "failed" })
+            .eq("id", payment.invoice_id);
+
+          return { processed: false, error: "Verification failed" };
+        }
       }
 
       // Verify amount matches
-      const verifiedAmount = verifyData.data.amount as number;
+      const verifiedAmount = (verifyData.data as Record<string, unknown>)?.amount as number;
       if (verifiedAmount !== payment.amount) {
         await supabaseAdmin
           .from("payments")

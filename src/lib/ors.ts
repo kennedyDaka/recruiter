@@ -1,5 +1,5 @@
 /**
- * Operon Recruitment Standard (ORS) — deterministic scoring engine.
+ * RecruiterMW (ORS) — deterministic scoring engine.
  *
  * This module is intentionally free of UI, database and framework imports so
  * scoring rules can evolve without touching the candidate or recruiter

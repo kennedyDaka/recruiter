@@ -15,9 +15,9 @@ import { LifeBuoy, MessageCircle, Mail, Phone, ExternalLink, Clock, ChevronRight
 
 export const Route = createFileRoute("/_authenticated/support")({ component: SupportCenterPage });
 
-const SUPPORT_PHONE = "+265 999 000 000";
-const SUPPORT_EMAIL = "support@operonrecruit.com";
-const SUPPORT_WHATSAPP = "265999000000";
+const SUPPORT_PHONE = "+265 882 575 364";
+const SUPPORT_EMAIL = "support@recruitermw.com";
+const SUPPORT_WHATSAPP = "265882575364";
 
 const STATUS_COLORS = {
   detected: "bg-red-100 text-red-800", open: "bg-blue-100 text-blue-800",
@@ -41,14 +41,14 @@ function SupportCenterPage() {
         <p className="text-muted-foreground">Need help? Reach us through any of these channels.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="cursor-pointer hover:border-green-500 hover:shadow-md transition-all" onClick={() => window.open("https://wa.me/" + SUPPORT_WHATSAPP + "?text=" + encodeURIComponent("Hello Operon Support"), "_blank")}>
+        <Card className="cursor-pointer hover:border-green-500 hover:shadow-md transition-all" onClick={() => window.open("https://wa.me/" + SUPPORT_WHATSAPP + "?text=" + encodeURIComponent("Hello RecruiterMW Support"), "_blank")}>
           <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
             <div className="rounded-full bg-green-100 p-3"><MessageCircle className="size-8 text-green-600" /></div>
             <div><p className="font-semibold">WhatsApp</p><p className="text-sm text-muted-foreground">Chat with us instantly</p></div>
             <Button size="sm" className="bg-green-600 hover:bg-green-700">Start Chat<ExternalLink className="ml-1 size-3" /></Button>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all" onClick={() => window.open("mailto:" + SUPPORT_EMAIL + "?subject=" + encodeURIComponent("Operon Recruit Support"), "_blank")}>
+        <Card className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all" onClick={() => window.open("mailto:" + SUPPORT_EMAIL + "?subject=" + encodeURIComponent("RecruiterMW Support"), "_blank")}>
           <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
             <div className="rounded-full bg-blue-100 p-3"><Mail className="size-8 text-blue-600" /></div>
             <div><p className="font-semibold">Email</p><p className="text-sm text-muted-foreground">{SUPPORT_EMAIL}</p></div>

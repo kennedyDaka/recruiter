@@ -45,9 +45,9 @@ import {
 export const Route = createFileRoute("/_authenticated/campaigns/$campaignId/")({
   head: () => ({
     meta: [
-      { title: "Campaign pipeline — Operon Recruit" },
+      { title: "Campaign pipeline — RecruiterMW" },
       { name: "description", content: "Review scored applications for this recruitment campaign." },
-      { property: "og:title", content: "Campaign pipeline — Operon Recruit" },
+      { property: "og:title", content: "Campaign pipeline — RecruiterMW" },
       { property: "og:description", content: "Review scored applications for this campaign." },
     ],
   }),

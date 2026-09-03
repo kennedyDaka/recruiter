@@ -596,6 +596,8 @@ model Payment {
   provider_transaction_id String?  // Charge ID from PayChangu
   tx_ref                  String   @unique // Our internal reference
   provider_tx_ref         String?  // Provider's reference
+  charge_id               String?  // Direct charge ID (Mobile Money)
+  phone_number            String?  // Customer phone for mobile money
   amount                  Int
   currency                String   @default("MWK")
   payment_method          String?  // airtel_money, tnmmamba, visa, mastercard, bank_transfer
@@ -617,6 +619,7 @@ model Payment {
   @@index([invoice_id])
   @@index([status])
   @@index([provider_transaction_id])
+  @@index([charge_id])
   @@map("payments")
 }
 
@@ -660,6 +663,49 @@ model WebhookLog {
   @@index([provider, event_type])
   @@index([processed])
   @@map("webhook_logs")
+}
+
+// ─── Promo Codes ────────────────────────────────────────────────────
+
+model PromoCode {
+  id            String   @id @default(uuid())
+  code_hash     String   @unique // SHA-256 hashed code
+  code_prefix   String   // First 4 chars for display (e.g. "A3KF-****")
+  discount_type String   // "free" or "percentage"
+  discount_value Int     // 100 for free, or 0-99 for percentage
+  max_uses      Int      @default(1)
+  used_count    Int      @default(0)
+  valid_from    DateTime @default(now())
+  valid_until   DateTime
+  active        Boolean  @default(true)
+  created_by    String   // user_id of admin who created it
+  tenant_id     String?  // Optional: restrict to specific tenant
+  metadata      String?  // JSON for extra data
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  usages        PromoCodeUsage[]
+
+  @@index([code_prefix])
+  @@index([active])
+  @@map("promo_codes")
+}
+
+model PromoCodeUsage {
+  id            String   @id @default(uuid())
+  promo_code_id String
+  user_id       String
+  tenant_id     String
+  invoice_id    String?
+  campaign_id   String?
+  discount_applied Int
+  created_at    DateTime @default(now())
+
+  promo_code    PromoCode @relation(fields: [promo_code_id], references: [id], onDelete: Cascade)
+
+  @@index([promo_code_id])
+  @@index([user_id])
+  @@map("promo_code_usages")
 }
 
 // ─── Recruitment Catalog ────────────────────────────────────────────

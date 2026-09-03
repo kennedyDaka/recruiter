@@ -58,7 +58,7 @@ function parseList(val: string | null): string[] {
 function buildFullShareText(c: Record<string, any>, url: string): string {
   const lines: string[] = [];
   lines.push(`📋 ${c.job_title || c.name}`);
-  lines.push(`🏢 ${c.tenants?.name || "Operon Recruit"}`);
+  lines.push(`🏢 ${c.tenants?.name || "RecruiterMW"}`);
   if (c.location) lines.push(`📍 ${c.location}`);
   if (c.employment_type) lines.push(`💼 ${c.employment_type}`);
   if (c.min_qualification) lines.push(`🎓 ${c.min_qualification}`);
@@ -73,7 +73,7 @@ function buildFullShareText(c: Record<string, any>, url: string): string {
 }
 
 function buildShortShareText(c: Record<string, any>): string {
-  const company = c.tenants?.name || "Operon Recruit";
+  const company = c.tenants?.name || "RecruiterMW";
   const title = c.job_title || c.name;
   const location = c.location ? ` — ${c.location}` : "";
   return `${title} at ${company}${location}`;
@@ -82,11 +82,11 @@ function buildShortShareText(c: Record<string, any>): string {
 export const Route = createFileRoute("/share/$publicToken")({
   head: () => ({
     meta: [
-      { title: "Job Vacancy — Operon Recruit" },
-      { property: "og:title", content: "New Job Vacancy — Operon Recruit" },
+      { title: "Job Vacancy — RecruiterMW" },
+      { property: "og:title", content: "New Job Vacancy — RecruiterMW" },
       { property: "og:description", content: "Apply now for this open position." },
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "Operon Recruit" },
+      { property: "og:site_name", content: "RecruiterMW" },
       { name: "description", content: "Apply now for this open position." },
       { name: "twitter:card", content: "summary" },
     ],
@@ -106,14 +106,14 @@ function ShareVacancyPage() {
 
   // Update document meta tags dynamically when campaign loads
   if (campaign && typeof document !== "undefined") {
-    const title = `${campaign.job_title || campaign.name} at ${campaign.tenants?.name || "Operon Recruit"}`;
+    const title = `${campaign.job_title || campaign.name} at ${campaign.tenants?.name || "RecruiterMW"}`;
     const desc = [
       campaign.location,
       campaign.employment_type,
       campaign.min_qualification,
     ].filter(Boolean).join(" • ") || "Apply now for this open position.";
 
-    document.title = `${title} — Operon Recruit`;
+    document.title = `${title} — RecruiterMW`;
 
     const setMeta = (attr: string, key: string, content: string) => {
       let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
@@ -216,7 +216,7 @@ function ShareVacancyPage() {
       <main className="container mx-auto px-4 py-8 max-w-3xl">
         {/* Company & Job Title */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-start gap-3 mb-2">
             {((campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url) ? (
               <img
                 src={(campaign as any)?.logo_data || (campaign as any)?.tenants?.logo_url}
@@ -395,7 +395,7 @@ function ShareVacancyPage() {
         <div className="sticky bottom-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-t -mx-4 px-4 py-4 mt-8">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold">{campaign.tenants?.name || "Operon Recruit"}</p>
+              <p className="font-semibold">{campaign.tenants?.name || "RecruiterMW"}</p>
               <p className="text-sm text-muted-foreground">
                 {toTitleCase(campaign.job_title || campaign.name || '')}
               </p>

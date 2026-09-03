@@ -13,9 +13,9 @@ function toTitleCase(s: string): string {
 export const Route = createFileRoute("/jobs")({
   head: () => ({
     meta: [
-      { title: "Open roles — Operon Recruit" },
+      { title: "Open roles — RecruiterMW" },
       { name: "description", content: "Browse active recruitment campaigns and apply online." },
-      { property: "og:title", content: "Open roles — Operon Recruit" },
+      { property: "og:title", content: "Open roles — RecruiterMW" },
       {
         property: "og:description",
         content: "Browse active recruitment campaigns and apply online.",
@@ -55,7 +55,7 @@ function JobsPage() {
               key={job.id}
               className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-6 shadow-sm"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-start gap-4">
                 {(job.tenants?.logo_data || job.tenants?.logo_url) ? (
                   <img
                     src={job.tenants?.logo_data || job.tenants?.logo_url}

@@ -8,25 +8,43 @@ import { z } from "zod";
  */
 export const getCurrentSessionFn = createServerFn({ method: "GET" }).handler(
   async () => {
-    const { getSessionFromCookieServer } = await import("@/lib/auth/session.server");
-    const session = await getSessionFromCookieServer();
-    if (!session) return null;
-    // Authoritative tenant from the database, not the JWT claim.
-    const { resolveTenantIdForUser } = await import("@/lib/tenant-guard");
-    const tenantId = await resolveTenantIdForUser(session.userId);
-    // Check for super_admin role (no tenant needed)
-    const { dbQueryFirst } = await import("@/lib/db");
-    const roleRow = await dbQueryFirst(
-      "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
-      [session.userId],
-    );
-    const role = (roleRow?.role as string) ?? "company_admin";
-    return {
-      userId: session.userId,
-      email: session.email,
-      tenantId,
-      role,
-    };
+    try {
+      const { getSessionFromCookieServer } = await import("@/lib/auth/session.server");
+      const session = await getSessionFromCookieServer();
+      if (!session) return null;
+
+      // Authoritative tenant from the database, not the JWT claim.
+      let tenantId: string | null = null;
+      try {
+        const { resolveTenantIdForUser } = await import("@/lib/tenant-guard");
+        tenantId = await resolveTenantIdForUser(session.userId);
+      } catch {
+        // Tenant resolution can fail — admin users may not have a tenant.
+      }
+
+      // Check for super_admin role (no tenant needed)
+      let role = "company_admin";
+      try {
+        const { dbQueryFirst } = await import("@/lib/db");
+        const roleRow = await dbQueryFirst(
+          "SELECT role FROM user_roles WHERE user_id = $1 LIMIT 1",
+          [session.userId],
+        );
+        role = (roleRow?.role as string) ?? "company_admin";
+      } catch {
+        // Role query failed — default to company_admin (non-admin).
+      }
+
+      return {
+        userId: session.userId,
+        email: session.email,
+        tenantId,
+        role,
+      };
+    } catch {
+      // Session cookie read/verify failed.
+      return null;
+    }
   },
 );
 

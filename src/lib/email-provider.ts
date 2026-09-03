@@ -166,7 +166,7 @@ async function sendViaSmtp(
   try {
     const transport = await getSmtpTransport(config);
     const from =
-      config.fromName && config.fromName !== "Operon Recruit"
+      config.fromName && config.fromName !== "RecruiterMW"
         ? `"${config.fromName}" <${input.from ?? config.from}>`
         : input.from ?? config.from;
     const info = await transport.sendMail({

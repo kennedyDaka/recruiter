@@ -74,14 +74,39 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Operon Recruit — Structured Hiring Platform" },
+      { title: "RecruiterMW — Recruitment, Organised from Vacancy to Hire" },
       {
         name: "description",
         content:
-          "Run professional hiring campaigns with structured applications, automated candidate scoring and a recruitment Kanban.",
+          "Create vacancies, collect applications and identify the candidates who actually match your requirements. Built for organisations in Malawi and beyond.",
       },
+      { name: "robots", content: "index, follow" },
+      { name: "theme-color", content: "#1a2744" },
+
+      // Open Graph
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "RecruiterMW" },
+      { property: "og:title", content: "RecruiterMW — Recruitment, Organised from Vacancy to Hire" },
+      {
+        property: "og:description",
+        content:
+          "Create vacancies, collect applications and identify the candidates who actually match your requirements. Built for organisations in Malawi and beyond.",
+      },
+      { property: "og:url", content: "https://recruitermw.com" },
+      { property: "og:image", content: "https://recruitermw.com/recruitermw-logo.png" },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
+      { property: "og:image:alt", content: "RecruiterMW" },
+
+      // Twitter Card
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "RecruiterMW — Recruitment, Organised from Vacancy to Hire" },
+      {
+        name: "twitter:description",
+        content:
+          "Create vacancies, collect applications and identify the candidates who actually match your requirements.",
+      },
+      { name: "twitter:image", content: "https://recruitermw.com/recruitermw-logo.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -92,6 +117,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap",
       },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
+      { rel: "canonical", href: "https://recruitermw.com" },
     ],
   }),
   shellComponent: RootShell,
@@ -101,10 +128,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "RecruiterMW",
+    url: "https://recruitermw.com",
+    logo: "https://recruitermw.com/recruitermw-logo.png",
+    description:
+      "Create vacancies, collect applications and identify the candidates who actually match your requirements. Built for organisations in Malawi and beyond.",
+    sameAs: [],
+    contactPoint: {
+      "@type": "ContactPoint",
+      email: "support@recruitermw.com",
+      contactType: "customer service",
+    },
+  };
+
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         {children}

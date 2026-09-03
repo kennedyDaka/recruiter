@@ -117,7 +117,7 @@ export async function sendSupportTicketEmail(input: SupportTicketInput) {
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
 
     <p style="font-size: 12px; color: #94a3b8; text-align: center;">
-      This support ticket was submitted through Operon Recruit.
+      This support ticket was submitted through RecruiterMW.
       Reference: ${input.referenceNumber}
     </p>
   </div>
@@ -142,7 +142,7 @@ Time: ${new Date().toLocaleString("en-GB")}
 
 ---
 Reference: ${input.referenceNumber}
-Operon Recruit — Support System
+RecruiterMW — Support System
 `;
 
   // Send to support team
@@ -151,7 +151,7 @@ Operon Recruit — Support System
     subject: `[${input.referenceNumber}] ${input.priority.toUpperCase()}: ${input.title}`,
     text,
     html,
-    fromName: "Operon Recruit Support",
+    fromName: "RecruiterMW Support",
   });
 
   // Also send confirmation to the reporter
@@ -159,7 +159,7 @@ Operon Recruit — Support System
     await sendEmail({
       to: input.reporterEmail,
       subject: `Support Ticket Received — ${input.referenceNumber}`,
-      text: `Hello ${input.reporterName},\n\nWe've received your support request.\n\nReference: ${input.referenceNumber}\nIssue: ${input.title}\n\nOur team is reviewing your issue. We'll get back to you as soon as possible.\n\nYou can reply to this email with additional information.\n\nBest regards,\nThe Operon Recruit Team`,
+      text: `Hello ${input.reporterName},\n\nWe've received your support request.\n\nReference: ${input.referenceNumber}\nIssue: ${input.title}\n\nOur team is reviewing your issue. We'll get back to you as soon as possible.\n\nYou can reply to this email with additional information.\n\nBest regards,\nThe RecruiterMW Team`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -178,11 +178,11 @@ Operon Recruit — Support System
     <p>Our team is reviewing your issue. We'll get back to you as soon as possible.</p>
     <p>You can reply to this email with additional information.</p>
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
-    <p style="font-size: 12px; color: #94a3b8; text-align: center;">The Operon Recruit Team</p>
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">The RecruiterMW Team</p>
   </div>
 </body>
 </html>`,
-      fromName: "Operon Recruit Support",
+      fromName: "RecruiterMW Support",
     });
   }
 

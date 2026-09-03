@@ -91,11 +91,11 @@ export const sendTestEmail = createServerFn({ method: "POST" })
     const result = await sendEmail(
       {
         to: data.to,
-        subject: "Operon Recruit — test email",
+        subject: "RecruiterMW — test email",
         text:
-          "This is a test email from your Operon Recruit workspace.\n\n" +
+          "This is a test email from your RecruiterMW workspace.\n\n" +
           "If you received this, your email integration is working correctly.\n\n" +
-          `— ${(tenantRes.data as { name?: string } | null)?.name ?? "Operon Recruit"}`,
+          `— ${(tenantRes.data as { name?: string } | null)?.name ?? "RecruiterMW"}`,
       },
       tenantConfig,
     );

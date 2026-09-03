@@ -14,7 +14,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/verify-email")({
   validateSearch: searchSchema,
   head: () => ({
-    meta: [{ title: "Confirm your email — Operon Recruit" }],
+    meta: [{ title: "Confirm your email — RecruiterMW" }],
   }),
   component: VerifyEmailPage,
 });

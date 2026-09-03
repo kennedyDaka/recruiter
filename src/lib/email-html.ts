@@ -1,8 +1,8 @@
 /**
- * Professional HTML email layout system for Operon Recruit.
+ * Professional HTML email layout system for RecruiterMW.
  *
  * Every email sent from the platform gets a consistent branded look:
- *   - Clean header with Operon Recruit logo
+ *   - Clean header with RecruiterMW logo
  *   - Content body
  *   - Footer with company info
  *
@@ -62,8 +62,8 @@ export function emailLayout(opts: EmailLayoutOpts): string {
 
   <!-- Header -->
   <tr><td style="padding-bottom:24px;text-align:center;">
-    <a href="https://operon-recruit-psi.vercel.app" style="text-decoration:none;">
-      <span style="font-family:Arial,sans-serif;font-size:26px;font-weight:800;color:${BRAND.primary};letter-spacing:-0.5px;">Operon Recruit</span>
+    <a href="https://recruitermw.com" style="text-decoration:none;">
+      <span style="font-family:Arial,sans-serif;font-size:26px;font-weight:800;color:${BRAND.primary};letter-spacing:-0.5px;">RecruiterMW</span>
     </a>
   </td></tr>
 
@@ -80,10 +80,10 @@ export function emailLayout(opts: EmailLayoutOpts): string {
   <!-- Footer -->
   <tr><td style="padding:24px 0;text-align:center;">
     <p style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:12px;color:${BRAND.muted};">
-      This is an automated message from Operon Recruit — intelligent hiring for Africa.
+      This is an automated message from RecruiterMW — intelligent hiring for Africa.
     </p>
     <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;color:${BRAND.muted};">
-      © ${new Date().getFullYear()} Operon Recruit. All rights reserved.
+      © ${new Date().getFullYear()} RecruiterMW. All rights reserved.
     </p>
   </td></tr>
 

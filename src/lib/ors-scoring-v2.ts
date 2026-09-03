@@ -297,14 +297,17 @@ function evaluateEligibility(
           passed = true;
           reason = "No minimum qualification set";
         } else if (candidateRank >= requiredRank) {
-          // Level is met — now check field relevance if fields are configured
+          // Level is met — now check field relevance using the education_field
+          // group's acceptedValues (not this group's, which contains degree names).
           const candidateFields = (candidate.fieldsOfStudy || []).filter(Boolean);
-          if (candidateFields.length > 0 && group.acceptedValues.length > 0) {
-            const fieldResult = classifyEducationFieldsRelevance(candidateFields, group.acceptedValues);
+          const fieldGroup = groups.find((g) => g.type === "education_field" && g.state !== "informational");
+          const fieldAcceptedValues = fieldGroup?.acceptedValues ?? [];
+          if (candidateFields.length > 0 && fieldAcceptedValues.length > 0) {
+            const fieldResult = classifyEducationFieldsRelevance(candidateFields, fieldAcceptedValues);
             if (fieldResult.relevance === "unrelated") {
               // Higher level but WRONG field — PRD Rule: not eligible
               passed = false;
-              reason = `${candidate.highestQualification} level meets requirement, but field (${candidateFields.join(", ")}) is not relevant to ${group.acceptedValues.join(", ")}`;
+              reason = `${candidate.highestQualification} level meets requirement, but field (${candidateFields.join(", ")}) is not relevant to ${fieldAcceptedValues.join(", ")}`;
             } else if (fieldResult.relevance === "weakly_related") {
               // Partially relevant — flag for review
               passed = group.state !== "required";

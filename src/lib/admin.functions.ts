@@ -39,6 +39,21 @@ export const getAdminStatsFn = createServerFn({ method: "GET" }).handler(
       .filter((p) => ["success", "completed", "paid"].includes(p.status))
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
+    const successfulPayments = payments.filter((p) => p.status === "success").length;
+    const failedPayments = payments.filter((p) => p.status === "failed").length;
+    const pendingPayments = payments.filter((p) =>
+      ["pending", "processing"].includes(p.status),
+    ).length;
+
+    // Payment method breakdown
+    const paymentByMethod: Record<string, number> = {};
+    payments
+      .filter((p) => p.status === "success")
+      .forEach((p) => {
+        const method = p.payment_method ?? "unknown";
+        paymentByMethod[method] = (paymentByMethod[method] ?? 0) + 1;
+      });
+
     const avgScore = applications.length
       ? Math.round(
           applications.reduce((s, a) => s + (a.score ?? 0), 0) / applications.length,
@@ -65,14 +80,17 @@ export const getAdminStatsFn = createServerFn({ method: "GET" }).handler(
       totalApplications: applications.length,
       recentApplications: recentApps,
       totalRevenue,
+      successfulPayments,
+      failedPayments,
+      pendingPayments,
+      totalPayments: payments.length,
+      paymentByMethod,
       avgScore,
       totalUsers: users.length,
       openIncidents: openIncidents.length,
       criticalIncidents: criticalIncidents.length,
       tenants: tenants.slice(0, 10),
-      recentPayments: payments
-        .filter((p) => ["success", "completed", "paid"].includes(p.status))
-        .slice(0, 5),
+      recentPayments: payments.slice(0, 10),
     };
   },
 );

@@ -596,7 +596,7 @@ function OccupationSearch({
 export const Route = createFileRoute("/apply/$campaignId")({
   head: () => ({
     meta: [
-      { title: "Apply - Operon Recruit" },
+      { title: "Apply - RecruiterMW" },
       { name: "description", content: "Submit a structured application for this role." },
     ],
   }),

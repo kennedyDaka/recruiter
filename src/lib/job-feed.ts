@@ -97,9 +97,9 @@ export async function renderJobFeed(origin: string): Promise<string> {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>Operon Recruit — live jobs</title>
+    <title>RecruiterMW — live jobs</title>
     <link>${escapeXml(base)}</link>
-    <description>Live recruitment campaigns published on Operon Recruit.</description>
+    <description>Live recruitment campaigns published on RecruiterMW.</description>
 ${items.join("\n")}
   </channel>
 </rss>

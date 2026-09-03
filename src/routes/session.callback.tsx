@@ -23,7 +23,7 @@ function safeTarget(value?: string): string {
 
 export const Route = createFileRoute("/session/callback")({
   validateSearch: searchSchema,
-  head: () => ({ meta: [{ title: "Signing you in — Operon Recruit" }] }),
+  head: () => ({ meta: [{ title: "Signing you in — RecruiterMW" }] }),
   loader: async ({ location }) => {
     const search = (location.search ?? {}) as { token?: string; redirect?: string };
 

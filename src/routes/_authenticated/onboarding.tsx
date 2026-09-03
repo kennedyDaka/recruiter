@@ -21,7 +21,7 @@ import { extractBrandColor, generateBrandTheme } from "@/lib/color-extraction"
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
     meta: [
-      { title: "Set up company workspace — Operon Recruit" },
+      { title: "Set up company workspace — RecruiterMW" },
       {
         name: "description",
         content: "Set up your company workspace before creating a recruitment campaign.",

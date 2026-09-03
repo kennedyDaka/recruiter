@@ -131,7 +131,7 @@ export function ReportIssueDialog({
 
   const buildWhatsAppMessage = () => {
     const lines = [
-      "Hello Operon Support, I need help with an issue.",
+      "Hello RecruiterMW Support, I need help with an issue.",
       "",
       `Issue: ${title || "Not specified"}`,
       ...(context?.campaignName ? [`Campaign: ${context.campaignName}`] : []),

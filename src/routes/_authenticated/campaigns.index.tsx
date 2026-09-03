@@ -17,9 +17,9 @@ import {
 export const Route = createFileRoute("/_authenticated/campaigns/")({
   head: () => ({
     meta: [
-      { title: "Campaigns — Operon Recruit" },
+      { title: "Campaigns — RecruiterMW" },
       { name: "description", content: "Create and manage your recruitment campaigns." },
-      { property: "og:title", content: "Campaigns — Operon Recruit" },
+      { property: "og:title", content: "Campaigns — RecruiterMW" },
       { property: "og:description", content: "Create and manage recruitment campaigns." },
     ],
   }),

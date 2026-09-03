@@ -21,6 +21,7 @@ import { Route as AuthenticatedContactCenterRouteImport } from './routes/_authen
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedKanbanRouteImport } from './routes/_authenticated/kanban'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as ApiPlansRouteImport } from './routes/api/plans'
@@ -30,6 +31,8 @@ import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
 import { Route as SessionCallbackRouteImport } from './routes/session.callback'
 import { Route as SessionSignoutRouteImport } from './routes/session.signout'
 import { Route as SharePublicTokenRouteImport } from './routes/share.$publicToken'
+import { Route as AuthenticatedAdminPromoCodesRouteImport } from './routes/_authenticated/admin/promo-codes'
+import { Route as AuthenticatedAdminTransactionsRouteImport } from './routes/_authenticated/admin/transactions'
 import { Route as AuthenticatedApplicationsApplicationIdRouteImport } from './routes/_authenticated/applications.$applicationId'
 import { Route as AuthenticatedCampaignsIndexRouteImport } from './routes/_authenticated/campaigns.index'
 import { Route as AuthenticatedCampaignsCampaignIdRouteImport } from './routes/_authenticated/campaigns.$campaignId'
@@ -40,12 +43,15 @@ import { Route as ApiCampaignsCampaignIdRouteImport } from './routes/api/campaig
 import { Route as ApiCatalogsUniversitiesRouteImport } from './routes/api/catalogs/universities'
 import { Route as ApiPaymentInitiateRouteImport } from './routes/api/payment/initiate'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
+import { Route as ApiPromoBypassRouteImport } from './routes/api/promo/bypass'
+import { Route as ApiPromoValidateRouteImport } from './routes/api/promo/validate'
 import { Route as ApiPublicJobsRouteImport } from './routes/api/public/jobs'
 import { Route as AuthenticatedCampaignsCampaignIdIndexRouteImport } from './routes/_authenticated/campaigns.$campaignId.index'
 import { Route as AuthenticatedCampaignsCampaignIdExtendRouteImport } from './routes/_authenticated/campaigns.$campaignId.extend'
 import { Route as AuthenticatedCampaignsCampaignIdPayRouteImport } from './routes/_authenticated/campaigns.$campaignId.pay'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google.callback'
 import { Route as ApiAuthLinkedinCallbackRouteImport } from './routes/api/auth/linkedin.callback'
+import { Route as ApiPaymentChargeStatusChargeIdRouteImport } from './routes/api/payment/charge-status.$chargeId'
 import { Route as ApiPaymentStatusTxRefRouteImport } from './routes/api/payment/status.$txRef'
 import { Route as ApiPaymentStatusCampaignCampaignIdRouteImport } from './routes/api/payment/status/campaign.$campaignId'
 
@@ -109,6 +115,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -154,6 +165,18 @@ const SharePublicTokenRoute = SharePublicTokenRouteImport.update({
   path: '/share/$publicToken',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminPromoCodesRoute =
+  AuthenticatedAdminPromoCodesRouteImport.update({
+    id: '/promo-codes',
+    path: '/promo-codes',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminTransactionsRoute =
+  AuthenticatedAdminTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedApplicationsApplicationIdRoute =
   AuthenticatedApplicationsApplicationIdRouteImport.update({
     id: '/applications/$applicationId',
@@ -208,6 +231,16 @@ const ApiPaymentWebhookRoute = ApiPaymentWebhookRouteImport.update({
   path: '/api/payment/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPromoBypassRoute = ApiPromoBypassRouteImport.update({
+  id: '/api/promo/bypass',
+  path: '/api/promo/bypass',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPromoValidateRoute = ApiPromoValidateRouteImport.update({
+  id: '/api/promo/validate',
+  path: '/api/promo/validate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicJobsRoute = ApiPublicJobsRouteImport.update({
   id: '/api/public/jobs',
   path: '/api/public/jobs',
@@ -241,6 +274,12 @@ const ApiAuthLinkedinCallbackRoute = ApiAuthLinkedinCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthLinkedinRoute,
 } as any)
+const ApiPaymentChargeStatusChargeIdRoute =
+  ApiPaymentChargeStatusChargeIdRouteImport.update({
+    id: '/api/payment/charge-status/$chargeId',
+    path: '/api/payment/charge-status/$chargeId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPaymentStatusTxRefRoute = ApiPaymentStatusTxRefRouteImport.update({
   id: '/api/payment/status/$txRef',
   path: '/api/payment/status/$txRef',
@@ -259,12 +298,13 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/candidates': typeof AuthenticatedCandidatesRoute
   '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kanban': typeof AuthenticatedKanbanRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
@@ -274,6 +314,8 @@ export interface FileRoutesByFullPath {
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
   '/share/$publicToken': typeof SharePublicTokenRoute
+  '/admin/promo-codes': typeof AuthenticatedAdminPromoCodesRoute
+  '/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
@@ -283,12 +325,15 @@ export interface FileRoutesByFullPath {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/promo/bypass': typeof ApiPromoBypassRoute
+  '/api/promo/validate': typeof ApiPromoValidateRoute
   '/api/public/jobs': typeof ApiPublicJobsRoute
   '/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
+  '/api/payment/charge-status/$chargeId': typeof ApiPaymentChargeStatusChargeIdRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -299,12 +344,13 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/candidates': typeof AuthenticatedCandidatesRoute
   '/contact-center': typeof AuthenticatedContactCenterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kanban': typeof AuthenticatedKanbanRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
@@ -314,6 +360,8 @@ export interface FileRoutesByTo {
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
   '/share/$publicToken': typeof SharePublicTokenRoute
+  '/admin/promo-codes': typeof AuthenticatedAdminPromoCodesRoute
+  '/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
   '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/campaigns/new': typeof AuthenticatedCampaignsNewRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
@@ -322,12 +370,15 @@ export interface FileRoutesByTo {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/promo/bypass': typeof ApiPromoBypassRoute
+  '/api/promo/validate': typeof ApiPromoValidateRoute
   '/api/public/jobs': typeof ApiPublicJobsRoute
   '/campaigns': typeof AuthenticatedCampaignsIndexRoute
   '/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
+  '/api/payment/charge-status/$chargeId': typeof ApiPaymentChargeStatusChargeIdRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -340,12 +391,13 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/candidates': typeof AuthenticatedCandidatesRoute
   '/_authenticated/contact-center': typeof AuthenticatedContactCenterRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/kanban': typeof AuthenticatedKanbanRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/api/plans': typeof ApiPlansRoute
@@ -355,6 +407,8 @@ export interface FileRoutesById {
   '/session/callback': typeof SessionCallbackRoute
   '/session/signout': typeof SessionSignoutRoute
   '/share/$publicToken': typeof SharePublicTokenRoute
+  '/_authenticated/admin/promo-codes': typeof AuthenticatedAdminPromoCodesRoute
+  '/_authenticated/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
   '/_authenticated/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/_authenticated/campaigns/$campaignId': typeof AuthenticatedCampaignsCampaignIdRouteWithChildren
   '/_authenticated/campaigns/new': typeof AuthenticatedCampaignsNewRoute
@@ -364,12 +418,15 @@ export interface FileRoutesById {
   '/api/catalogs/universities': typeof ApiCatalogsUniversitiesRoute
   '/api/payment/initiate': typeof ApiPaymentInitiateRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
+  '/api/promo/bypass': typeof ApiPromoBypassRoute
+  '/api/promo/validate': typeof ApiPromoValidateRoute
   '/api/public/jobs': typeof ApiPublicJobsRoute
   '/_authenticated/campaigns/': typeof AuthenticatedCampaignsIndexRoute
   '/_authenticated/campaigns/$campaignId/extend': typeof AuthenticatedCampaignsCampaignIdExtendRoute
   '/_authenticated/campaigns/$campaignId/pay': typeof AuthenticatedCampaignsCampaignIdPayRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/linkedin/callback': typeof ApiAuthLinkedinCallbackRoute
+  '/api/payment/charge-status/$chargeId': typeof ApiPaymentChargeStatusChargeIdRoute
   '/api/payment/status/$txRef': typeof ApiPaymentStatusTxRefRoute
   '/_authenticated/campaigns/$campaignId/': typeof AuthenticatedCampaignsCampaignIdIndexRoute
   '/api/payment/status/campaign/$campaignId': typeof ApiPaymentStatusCampaignCampaignIdRoute
@@ -388,6 +445,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/onboarding'
+    | '/payments'
     | '/settings'
     | '/support'
     | '/api/plans'
@@ -397,6 +455,8 @@ export interface FileRouteTypes {
     | '/session/callback'
     | '/session/signout'
     | '/share/$publicToken'
+    | '/admin/promo-codes'
+    | '/admin/transactions'
     | '/applications/$applicationId'
     | '/campaigns/$campaignId'
     | '/campaigns/new'
@@ -406,12 +466,15 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/promo/bypass'
+    | '/api/promo/validate'
     | '/api/public/jobs'
     | '/campaigns/'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
     | '/api/auth/linkedin/callback'
+    | '/api/payment/charge-status/$chargeId'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -428,6 +491,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/onboarding'
+    | '/payments'
     | '/settings'
     | '/support'
     | '/api/plans'
@@ -437,6 +501,8 @@ export interface FileRouteTypes {
     | '/session/callback'
     | '/session/signout'
     | '/share/$publicToken'
+    | '/admin/promo-codes'
+    | '/admin/transactions'
     | '/applications/$applicationId'
     | '/campaigns/new'
     | '/api/auth/google'
@@ -445,12 +511,15 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/promo/bypass'
+    | '/api/promo/validate'
     | '/api/public/jobs'
     | '/campaigns'
     | '/campaigns/$campaignId/extend'
     | '/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
     | '/api/auth/linkedin/callback'
+    | '/api/payment/charge-status/$chargeId'
     | '/api/payment/status/$txRef'
     | '/campaigns/$campaignId'
     | '/api/payment/status/campaign/$campaignId'
@@ -468,6 +537,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/kanban'
     | '/_authenticated/onboarding'
+    | '/_authenticated/payments'
     | '/_authenticated/settings'
     | '/_authenticated/support'
     | '/api/plans'
@@ -477,6 +547,8 @@ export interface FileRouteTypes {
     | '/session/callback'
     | '/session/signout'
     | '/share/$publicToken'
+    | '/_authenticated/admin/promo-codes'
+    | '/_authenticated/admin/transactions'
     | '/_authenticated/applications/$applicationId'
     | '/_authenticated/campaigns/$campaignId'
     | '/_authenticated/campaigns/new'
@@ -486,12 +558,15 @@ export interface FileRouteTypes {
     | '/api/catalogs/universities'
     | '/api/payment/initiate'
     | '/api/payment/webhook'
+    | '/api/promo/bypass'
+    | '/api/promo/validate'
     | '/api/public/jobs'
     | '/_authenticated/campaigns/'
     | '/_authenticated/campaigns/$campaignId/extend'
     | '/_authenticated/campaigns/$campaignId/pay'
     | '/api/auth/google/callback'
     | '/api/auth/linkedin/callback'
+    | '/api/payment/charge-status/$chargeId'
     | '/api/payment/status/$txRef'
     | '/_authenticated/campaigns/$campaignId/'
     | '/api/payment/status/campaign/$campaignId'
@@ -517,7 +592,10 @@ export interface RootRouteChildren {
   ApiCatalogsUniversitiesRoute: typeof ApiCatalogsUniversitiesRoute
   ApiPaymentInitiateRoute: typeof ApiPaymentInitiateRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
+  ApiPromoBypassRoute: typeof ApiPromoBypassRoute
+  ApiPromoValidateRoute: typeof ApiPromoValidateRoute
   ApiPublicJobsRoute: typeof ApiPublicJobsRoute
+  ApiPaymentChargeStatusChargeIdRoute: typeof ApiPaymentChargeStatusChargeIdRoute
   ApiPaymentStatusTxRefRoute: typeof ApiPaymentStatusTxRefRoute
   ApiPaymentStatusCampaignCampaignIdRoute: typeof ApiPaymentStatusCampaignCampaignIdRoute
 }
@@ -608,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/payments': {
+      id: '/_authenticated/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -670,6 +755,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/share/$publicToken'
       preLoaderRoute: typeof SharePublicTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/promo-codes': {
+      id: '/_authenticated/admin/promo-codes'
+      path: '/promo-codes'
+      fullPath: '/admin/promo-codes'
+      preLoaderRoute: typeof AuthenticatedAdminPromoCodesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/transactions': {
+      id: '/_authenticated/admin/transactions'
+      path: '/transactions'
+      fullPath: '/admin/transactions'
+      preLoaderRoute: typeof AuthenticatedAdminTransactionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/applications/$applicationId': {
       id: '/_authenticated/applications/$applicationId'
@@ -741,6 +840,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/promo/bypass': {
+      id: '/api/promo/bypass'
+      path: '/api/promo/bypass'
+      fullPath: '/api/promo/bypass'
+      preLoaderRoute: typeof ApiPromoBypassRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/promo/validate': {
+      id: '/api/promo/validate'
+      path: '/api/promo/validate'
+      fullPath: '/api/promo/validate'
+      preLoaderRoute: typeof ApiPromoValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs': {
       id: '/api/public/jobs'
       path: '/api/public/jobs'
@@ -783,6 +896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthLinkedinCallbackRouteImport
       parentRoute: typeof ApiAuthLinkedinRoute
     }
+    '/api/payment/charge-status/$chargeId': {
+      id: '/api/payment/charge-status/$chargeId'
+      path: '/api/payment/charge-status/$chargeId'
+      fullPath: '/api/payment/charge-status/$chargeId'
+      preLoaderRoute: typeof ApiPaymentChargeStatusChargeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/payment/status/$txRef': {
       id: '/api/payment/status/$txRef'
       path: '/api/payment/status/$txRef'
@@ -799,6 +919,19 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminPromoCodesRoute: typeof AuthenticatedAdminPromoCodesRoute
+  AuthenticatedAdminTransactionsRoute: typeof AuthenticatedAdminTransactionsRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminPromoCodesRoute: AuthenticatedAdminPromoCodesRoute,
+  AuthenticatedAdminTransactionsRoute: AuthenticatedAdminTransactionsRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedCampaignsCampaignIdRouteChildren {
   AuthenticatedCampaignsCampaignIdExtendRoute: typeof AuthenticatedCampaignsCampaignIdExtendRoute
@@ -822,12 +955,13 @@ const AuthenticatedCampaignsCampaignIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedCandidatesRoute: typeof AuthenticatedCandidatesRoute
   AuthenticatedContactCenterRoute: typeof AuthenticatedContactCenterRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedKanbanRoute: typeof AuthenticatedKanbanRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedApplicationsApplicationIdRoute: typeof AuthenticatedApplicationsApplicationIdRoute
@@ -837,12 +971,13 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedCandidatesRoute: AuthenticatedCandidatesRoute,
   AuthenticatedContactCenterRoute: AuthenticatedContactCenterRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedKanbanRoute: AuthenticatedKanbanRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedApplicationsApplicationIdRoute:
@@ -900,7 +1035,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCatalogsUniversitiesRoute: ApiCatalogsUniversitiesRoute,
   ApiPaymentInitiateRoute: ApiPaymentInitiateRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,
+  ApiPromoBypassRoute: ApiPromoBypassRoute,
+  ApiPromoValidateRoute: ApiPromoValidateRoute,
   ApiPublicJobsRoute: ApiPublicJobsRoute,
+  ApiPaymentChargeStatusChargeIdRoute: ApiPaymentChargeStatusChargeIdRoute,
   ApiPaymentStatusTxRefRoute: ApiPaymentStatusTxRefRoute,
   ApiPaymentStatusCampaignCampaignIdRoute:
     ApiPaymentStatusCampaignCampaignIdRoute,

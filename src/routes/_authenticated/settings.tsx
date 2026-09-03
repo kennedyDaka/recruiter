@@ -37,7 +37,7 @@ import type { DistributionSettings } from "@/lib/tenant-settings";
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Operon Recruit" },
+      { title: "Settings — RecruiterMW" },
       {
         name: "description",
         content: "Manage your workspace settings, automation rules and email integration.",

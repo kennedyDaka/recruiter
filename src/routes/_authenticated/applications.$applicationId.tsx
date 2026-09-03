@@ -48,16 +48,16 @@ const STATUSES = [
 export const Route = createFileRoute("/_authenticated/applications/$applicationId")({
   head: () => ({
     meta: [
-      { title: "Applicant review — Operon Recruit" },
+      { title: "Applicant review — RecruiterMW" },
       {
         name: "description",
         content:
-          "Review a scored applicant: ORS breakdown, work history, documents, pipeline stage, notes and interviews.",
+          "Review a scored applicant: score breakdown, work history, documents, pipeline stage, notes and interviews.",
       },
-      { property: "og:title", content: "Applicant review — Operon Recruit" },
+      { property: "og:title", content: "Applicant review — RecruiterMW" },
       {
         property: "og:description",
-        content: "ORS score breakdown, work history, pipeline stage, notes and interviews.",
+        content: "Score breakdown, work history, pipeline stage, notes and interviews.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

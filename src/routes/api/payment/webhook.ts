@@ -2,21 +2,10 @@
  * PayChangu Webhook Handler
  *
  * Receives POST notifications from PayChangu when payment status changes.
- * Verifies transaction server-side before activating campaigns.
+ * Handles both checkout payments (charge.success) and
+ * Direct Mobile Money charges (api.charge.payment).
  *
- * Expected payload from PayChangu:
- * {
- *   "event": "charge.success",
- *   "data": {
- *     "id": "...",
- *     "tx_ref": "...",
- *     "amount": 95000,
- *     "currency": "MWK",
- *     "status": "success",
- *     "charge_id": "...",
- *     "payment_method": "airtel_money"
- *   }
- * }
+ * Verifies transaction server-side before activating campaigns.
  */
 
 import { json } from "@tanstack/react-start";
@@ -39,10 +28,7 @@ export const Route = createFileRoute("/api/payment/webhook")({
             return json({ error: "Invalid JSON" }, { status: 400 });
           }
 
-          // Verify HMAC signature. When a webhook secret is configured it is
-          // mandatory — the comparison is constant-time to avoid timing oracles.
-          // Outside test mode an unconfigured secret is a configuration error
-          // and the webhook is refused rather than processed unverified.
+          // Verify HMAC signature
           const webhookSecret = process.env["PAYCHANGU_WEBHOOK_SECRET"];
           const testMode = process.env["PAYCHANGU_TEST_MODE"] === "true";
           if (!webhookSecret && !testMode) {
@@ -51,8 +37,6 @@ export const Route = createFileRoute("/api/payment/webhook")({
           }
           if (webhookSecret) {
             const crypto = await import("crypto");
-            // PayChangu signs with the hex-encoded SHA-256 HMAC of the raw
-            // payload, sent in the "Signature"/"x-paychangu-signature" header.
             const expectedHex = crypto
               .createHmac("sha256", webhookSecret)
               .update(rawBody)
@@ -60,15 +44,41 @@ export const Route = createFileRoute("/api/payment/webhook")({
             const provided = Buffer.from(signature, "utf8");
             const expected = Buffer.from(expectedHex, "utf8");
             const valid =
-              provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+              provided.length === expected.length &&
+              crypto.timingSafeEqual(provided, expected);
             if (!valid) {
               console.error("Webhook signature verification failed");
               return json({ error: "Invalid signature" }, { status: 401 });
             }
           }
 
+          // Determine event type — handle both checkout and direct charge formats
+          const eventType =
+            (payload["event_type"] as string) ?? (payload["event"] as string) ?? "unknown";
+
+          // Only process successful payment events
+          // checkout: "charge.success"
+          // direct charge: "api.charge.payment"
+          const isSuccess =
+            eventType === "charge.success" || eventType === "api.charge.payment";
+
+          if (!isSuccess) {
+            // Log and ignore non-success events
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            await supabaseAdmin.from("webhook_logs").insert({
+              provider: "paychangu",
+              event_type: eventType,
+              payload: JSON.stringify(payload),
+              signature: signature || null,
+              processed: true,
+            });
+            return json({ received: true });
+          }
+
           // Process the webhook through the PaymentService
-          const { processPayChanguWebhook } = await import("@/lib/payment/payment.service");
+          const { processPayChanguWebhook } = await import(
+            "@/lib/payment/payment.service"
+          );
 
           const result = (await processPayChanguWebhook({
             data: {
@@ -91,7 +101,10 @@ export const Route = createFileRoute("/api/payment/webhook")({
                 channel: "webhook",
               });
             } catch {}
-            return json({ error: result?.error ?? "Processing failed" }, { status: 400 });
+            return json(
+              { error: result?.error ?? "Processing failed" },
+              { status: 400 },
+            );
           }
 
           return json({ received: true });

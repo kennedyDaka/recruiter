@@ -21,7 +21,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/reset-password")({
   validateSearch: searchSchema,
   head: () => ({
-    meta: [{ title: "Reset your password — Operon Recruit" }],
+    meta: [{ title: "Reset your password — RecruiterMW" }],
   }),
   component: ResetPasswordPage,
 });
@@ -196,7 +196,7 @@ function ResetPasswordPage() {
                 <h1 className="font-display text-xl font-semibold">Choose a new password</h1>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                Pick a strong password for your Operon Recruit account.
+                Pick a strong password for your RecruiterMW account.
               </p>
               <form onSubmit={handleReset} className="mt-6 space-y-4">
                 <div className="space-y-2">

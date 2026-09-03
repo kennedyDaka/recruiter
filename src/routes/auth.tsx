@@ -23,14 +23,14 @@ export const Route = createFileRoute("/auth")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Employer sign in — Operon Recruit" },
+      { title: "Employer sign in — RecruiterMW" },
       {
         name: "description",
         content:
-          "Sign in or create your Operon Recruit company workspace to manage hiring campaigns.",
+          "Sign in or create your RecruiterMW company workspace to manage hiring campaigns.",
       },
-      { property: "og:title", content: "Employer sign in — Operon Recruit" },
-      { property: "og:description", content: "Access your Operon Recruit hiring workspace." },
+      { property: "og:title", content: "Employer sign in — RecruiterMW" },
+      { property: "og:description", content: "Access your RecruiterMW hiring workspace." },
     ],
   }),
   component: AuthPage,
@@ -416,7 +416,7 @@ function AuthPage() {
               </Button>
 
               <p className="mt-6 text-center text-sm text-muted-foreground">
-                {mode === "signup" ? "Already have an account?" : "New to Operon Recruit?"}{" "}
+                {mode === "signup" ? "Already have an account?" : "New to RecruiterMW?"}{" "}
                 <button
                   type="button"
                   className="font-medium text-primary underline-offset-4 hover:underline"

@@ -54,12 +54,12 @@ type PipelineApplication = {
 export const Route = createFileRoute("/_authenticated/kanban")({
   head: () => ({
     meta: [
-      { title: "Recruitment Kanban — Operon Recruit" },
+      { title: "Recruitment Kanban — RecruiterMW" },
       {
         name: "description",
         content: "Move candidates through each stage of your recruitment pipeline.",
       },
-      { property: "og:title", content: "Recruitment Kanban — Operon Recruit" },
+      { property: "og:title", content: "Recruitment Kanban — RecruiterMW" },
       {
         property: "og:description",
         content: "Review and move candidates through the recruitment pipeline.",

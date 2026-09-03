@@ -85,14 +85,14 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<
 
   // ─── Email verification (account signup) ───────────────────────────────
   email_verification: {
-    subject: "Confirm your email — Operon Recruit",
-    body: `Hello {{first_name}},\n\nThank you for creating your Operon Recruit account. Please confirm your email address to activate it:\n\n{{verify_url}}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this email.\n\nBest regards,\nThe Operon Recruit Team`,
+    subject: "Confirm your email — RecruiterMW",
+    body: `Hello {{first_name}},\n\nThank you for creating your RecruiterMW account. Please confirm your email address to activate it:\n\n{{verify_url}}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this email.\n\nBest regards,\nThe RecruiterMW Team`,
   },
 
   // ─── Password reset ────────────────────────────────────────────────────
   password_reset: {
-    subject: "Reset your password — Operon Recruit",
-    body: `Hello {{first_name}},\n\nWe received a request to reset the password for your Operon Recruit account. Click the link below to choose a new password:\n\n{{reset_url}}\n\nThis link expires in 1 hour. If you did not request a password reset, you can safely ignore this email — your password will not change.\n\nBest regards,\nThe Operon Recruit Team`,
+    subject: "Reset your password — RecruiterMW",
+    body: `Hello {{first_name}},\n\nWe received a request to reset the password for your RecruiterMW account. Click the link below to choose a new password:\n\n{{reset_url}}\n\nThis link expires in 1 hour. If you did not request a password reset, you can safely ignore this email — your password will not change.\n\nBest regards,\nThe RecruiterMW Team`,
   },
 };
 
@@ -197,12 +197,12 @@ function htmlEmailVerification(v: Record<string, string>): string {
     body: `
       ${heading("Confirm Your Email")}
       ${paragraph(`Hello <strong>${v.first_name}</strong>,`)}
-      ${paragraph("Thank you for creating your Operon Recruit account. Please click the button below to confirm your email address and activate your account.")}
+      ${paragraph("Thank you for creating your RecruiterMW account. Please click the button below to confirm your email address and activate your account.")}
       ${ctaButton("Confirm Email Address", v.verify_url ?? "#")}
       ${divider()}
       ${infoBox("This link expires in <strong>24 hours</strong>. If you did not create this account, you can safely ignore this email.", "warning")}
       ${paragraph("Best regards,", { mt: 20 })}
-      ${paragraph("<strong>The Operon Recruit Team</strong>", { muted: true })}
+      ${paragraph("<strong>The RecruiterMW Team</strong>", { muted: true })}
     `,
   });
 }
@@ -213,12 +213,12 @@ function htmlPasswordReset(v: Record<string, string>): string {
     body: `
       ${heading("Reset Your Password")}
       ${paragraph(`Hello <strong>${v.first_name}</strong>,`)}
-      ${paragraph("We received a request to reset the password for your Operon Recruit account. Click the button below to choose a new password.")}
+      ${paragraph("We received a request to reset the password for your RecruiterMW account. Click the button below to choose a new password.")}
       ${ctaButton("Reset Password", v.reset_url ?? "#")}
       ${divider()}
       ${infoBox("This link expires in <strong>1 hour</strong>. If you did not request a password reset, you can safely ignore this email — your password will not change.", "warning")}
       ${paragraph("Best regards,", { mt: 20 })}
-      ${paragraph("<strong>The Operon Recruit Team</strong>", { muted: true })}
+      ${paragraph("<strong>The RecruiterMW Team</strong>", { muted: true })}
     `,
   });
 }
@@ -284,7 +284,7 @@ export function renderEmail(
     // Custom templates get a simple HTML wrapper
     html: emailLayout({
       body: `
-        ${heading("Operon Recruit")}
+        ${heading("RecruiterMW")}
         ${body.split("\n").map((line) => paragraph(line)).join("\n")}
       `,
     }),

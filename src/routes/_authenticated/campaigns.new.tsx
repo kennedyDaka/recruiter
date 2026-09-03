@@ -6,13 +6,13 @@ import { CampaignWizard } from "@/components/recruitment/CampaignWizard";
 export const Route = createFileRoute("/_authenticated/campaigns/new")({
   head: () => ({
     meta: [
-      { title: "New campaign — Operon Recruit" },
+      { title: "New campaign — RecruiterMW" },
       {
         name: "description",
         content:
           "Build a structured recruitment campaign: role, requirements, questions and scoring.",
       },
-      { property: "og:title", content: "New campaign — Operon Recruit" },
+      { property: "og:title", content: "New campaign — RecruiterMW" },
       {
         property: "og:description",
         content: "Build a structured recruitment campaign step by step.",
